@@ -23,7 +23,7 @@ const dataSubMenu = [
   {
     icon: IconManualInput,
     label: 'Nhập vé',
-    navigate: 'Scan',
+    navigate: 'ManualInput',
   },
   {
     icon: IconMyTicket,
@@ -33,7 +33,7 @@ const dataSubMenu = [
   {
     icon: IconCalendar,
     label: 'Lịch xổ số',
-    navigate: 'Result',
+    navigate: 'Schedule',
   },
 ]
 
@@ -44,7 +44,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
 
   const BellPressableIcon = () => {
     return (
-      <TouchableOpacity onPress={() => console.log('navigate to notifications')} activeOpacity={0.5}>
+      <TouchableOpacity onPress={() => navigation.navigate('Notification')} activeOpacity={0.5}>
         <IconBellNoti width={60} height={60} />
       </TouchableOpacity>
     )
@@ -86,7 +86,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
 
         {/* 3 Miền Bắc Trung Nam */}
         <View style={{ flexDirection: 'column', gap: spacing.md, marginBottom: spacing.md }}>
-          <View style={themed($resultItemWrapper)}>
+          <TouchableOpacity style={themed($resultItemWrapper)} onPress={() => navigation.navigate("Result", { itemIndex: "0", queryIndex: "Sdfds" })}>
             <View style={themed([$nameRegionWrapper, { backgroundColor: "#ededb6ff" }])}>
               <Text text='Bắc' style={themed([$textRegion, { color: "#e1ab07ff" }])} />
             </View>
@@ -103,8 +103,8 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
             <View>
               <IconArrowRight width={16} height={16} />
             </View>
-          </View>
-          <View style={themed($resultItemWrapper)}>
+          </TouchableOpacity>
+          <TouchableOpacity style={themed($resultItemWrapper)}>
             <View style={themed([$nameRegionWrapper, { backgroundColor: "#DBEAFE" }])}>
               <Text text='Trung' style={themed([$textRegion, { color: "#2563EB" }])} />
             </View>
@@ -121,8 +121,8 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
             <View>
               <IconArrowRight width={16} height={16} />
             </View>
-          </View>
-          <View style={themed($resultItemWrapper)}>
+          </TouchableOpacity>
+          <TouchableOpacity style={themed($resultItemWrapper)}>
             <View style={themed([$nameRegionWrapper, { backgroundColor: "#DCFCE7" }])}>
               <Text text='Nam' style={themed([$textRegion, { color: "#16A34A" }])} />
             </View>
@@ -139,7 +139,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
             <View>
               <IconArrowRight width={16} height={16} />
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>

@@ -11,13 +11,14 @@ import Config from "@/config"
 import { useAuth } from "@/context/AuthContext"
 import { ErrorBoundary } from "@/screens/ErrorScreen/ErrorBoundary"
 import { LoginScreen } from "@/screens/LoginScreen"
-import { WelcomeScreen } from "@/screens/WelcomeScreen"
 import { useAppTheme } from "@/theme/context"
 
-import { DemoNavigator } from "./DemoNavigator"
 import type { AppStackParamList, NavigationProps } from "./navigationTypes"
 import { navigationRef, useBackButtonHandler } from "./navigationUtilities"
 import { MainNavigator } from "./MainNavigator"
+import { ManualInputScreen } from "@/screens/ManualInputScreen"
+import { LotteryScheduleScreen } from "@/screens/LotteryScheduleScreen"
+import { NotificationScreen } from "@/screens/NotificationScreen"
 
 /**
  * This is a list of all the route names that will exit the app if the back button
@@ -49,6 +50,9 @@ const AppStack = () => {
       {isAuthenticated ? (
         <>
           <Stack.Screen name="Main" component={MainNavigator} />
+          <Stack.Screen name="ManualInput" component={ManualInputScreen} />
+          <Stack.Screen name="Schedule" component={LotteryScheduleScreen} />
+          <Stack.Screen name="Notification" component={NotificationScreen} />
         </>
       ) : (
         <>

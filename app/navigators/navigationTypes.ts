@@ -33,6 +33,9 @@ export type AppStackParamList = {
   Login: undefined
   Demo: NavigatorScreenParams<DemoTabParamList>
   Main: NavigatorScreenParams<HomeTabParamList>
+  ManualInput: undefined
+  Schedule: undefined
+  Notification: undefined
   // 🔥 Your screens go here
   // IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
 }
@@ -41,11 +44,6 @@ export type AppStackScreenProps<T extends keyof AppStackParamList> = NativeStack
   AppStackParamList,
   T
 >
-
-export type DemoTabScreenProps<T extends keyof DemoTabParamList> = CompositeScreenProps<
-  BottomTabScreenProps<DemoTabParamList, T>,
-  AppStackScreenProps<keyof AppStackParamList>
-  >
 
 export type HomeTabScreenProps<T extends keyof HomeTabParamList> = CompositeScreenProps<
   BottomTabScreenProps<HomeTabParamList, T>,

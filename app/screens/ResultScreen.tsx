@@ -13,6 +13,8 @@ import { useState } from "react";
 import { DatePicker } from "@/components/DatePicker";
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
+  // how to get params from _props.route.params
+
   const { themed, theme: { colors, spacing } } = useAppTheme();
 
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
