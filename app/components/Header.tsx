@@ -180,8 +180,7 @@ export function Header(props: HeaderProps) {
     containerStyle: $containerStyleOverride,
   } = props
 
-  const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
-
+  const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges);
   const titleContent = titleTx ? translate(titleTx, titleTxOptions) : title
 
   return (

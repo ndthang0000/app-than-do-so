@@ -15,11 +15,24 @@ export type DemoTabParamList = {
   DemoPodcastList: undefined
 }
 
+export type HomeTabParamList = {
+  DemoCommunity: undefined
+  DemoShowroom: { queryIndex?: string; itemIndex?: string }
+  DemoDebug: undefined
+  DemoPodcastList: undefined
+  Home: undefined
+  Result: { queryIndex?: string; itemIndex?: string }
+  Scan: undefined
+  MyTicket: undefined
+  Account: undefined
+}
+
 // App Stack Navigator types
 export type AppStackParamList = {
   Welcome: undefined
   Login: undefined
   Demo: NavigatorScreenParams<DemoTabParamList>
+  Main: NavigatorScreenParams<HomeTabParamList>
   // 🔥 Your screens go here
   // IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
 }
@@ -31,6 +44,11 @@ export type AppStackScreenProps<T extends keyof AppStackParamList> = NativeStack
 
 export type DemoTabScreenProps<T extends keyof DemoTabParamList> = CompositeScreenProps<
   BottomTabScreenProps<DemoTabParamList, T>,
+  AppStackScreenProps<keyof AppStackParamList>
+  >
+
+export type HomeTabScreenProps<T extends keyof HomeTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<HomeTabParamList, T>,
   AppStackScreenProps<keyof AppStackParamList>
 >
 

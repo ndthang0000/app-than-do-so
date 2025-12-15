@@ -1,50 +1,81 @@
 const palette = {
-  neutral900: "#FFFFFF",
-  neutral800: "#F4F2F1",
-  neutral700: "#D7CEC9",
-  neutral600: "#B6ACA6",
-  neutral500: "#978F8A",
-  neutral400: "#564E4A",
-  neutral300: "#3C3836",
-  neutral200: "#191015",
+  // 🖤 Neutral – Dark background
   neutral100: "#000000",
+  neutral200: "#121212",
+  neutral300: "#1E1E1E",
+  neutral400: "#2C2C2C",
+  neutral500: "#3A3A3A",
+  neutral600: "#6F6F6F",
+  neutral700: "#9E9E9E",
+  neutral800: "#E0E0E0",
+  neutral900: "#FFFFFF",
 
-  primary600: "#F4E0D9",
-  primary500: "#E8C1B4",
-  primary400: "#DDA28E",
-  primary300: "#D28468",
-  primary200: "#C76542",
-  primary100: "#A54F31",
+  // 🔴 Lucky Red – Dark optimized
+  primary100: "#B71C1C",
+  primary200: "#C62828",
+  primary300: "#D32F2F",
+  primary400: "#E53935",
+  primary500: "#F44336", // MAIN RED (dark)
+  primary600: "#FFCDD2",
 
-  secondary500: "#DCDDE9",
-  secondary400: "#BCC0D6",
-  secondary300: "#9196B9",
-  secondary200: "#626894",
-  secondary100: "#41476E",
+  // 🟡 Gold Accent – Dark mode
+  accent100: "#FFB300",
+  accent200: "#FFD54F",
+  accent300: "#FFE082",
+  accent400: "#FFECB3",
+  accent500: "#FFF8E1",
 
-  accent500: "#FFEED4",
-  accent400: "#FFE1B2",
-  accent300: "#FDD495",
-  accent200: "#FBC878",
-  accent100: "#FFBB50",
+  // 🔵 Secondary (info / link)
+  secondary100: "#0D47A1",
+  secondary200: "#1565C0",
+  secondary300: "#1976D2",
+  secondary400: "#42A5F5",
+  secondary500: "#90CAF9",
 
-  angry100: "#F2D6CD",
-  angry500: "#C03403",
+  // ❌ Error
+  angry100: "#D32F2F",
+  angry500: "#EF5350",
 
-  overlay20: "rgba(25, 16, 21, 0.2)",
-  overlay50: "rgba(25, 16, 21, 0.5)",
+  // Overlay
+  overlay20: "rgba(0, 0, 0, 0.2)",
+  overlay50: "rgba(0, 0, 0, 0.5)",
 } as const
+
 
 export const colors = {
   palette,
+
   transparent: "rgba(0, 0, 0, 0)",
+
+  // 📝 Text
   text: palette.neutral800,
   textDim: palette.neutral600,
+  textInverse: palette.neutral100,
+
+  // 🖤 Background
   background: palette.neutral200,
+  surface: palette.neutral300,
+  card: palette.neutral300,
+
+  // Border & Separator
   border: palette.neutral400,
+  separator: palette.neutral400,
+
+  // 🔴 Primary – Lucky Red
+  primary: palette.primary400,
+  primaryPressed: palette.primary400,
+  primarySubtle: palette.primary100,
+
+  // 🟡 Gold Accent
+  gold: palette.accent100,
+  goldSubtle: palette.accent200,
+
+  // Tint (navigation / active)
   tint: palette.primary500,
-  tintInactive: palette.neutral300,
-  separator: palette.neutral300,
+  tintInactive: palette.neutral500,
+
+  // ❌ Error
   error: palette.angry500,
   errorBackground: palette.angry100,
 } as const
+
