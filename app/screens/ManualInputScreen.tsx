@@ -250,8 +250,8 @@ const $datePickerCard: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   borderRadius: spacing.lg,
   padding: spacing.md,
   // Shadow style tương tự các card khác
-  shadowColor: colors.palette.neutral400,
-  shadowOffset: { width: 0, height: 2 },
+  shadowColor: colors.palette.primary300,
+  shadowOffset: { width: 2, height: 5 },
   shadowOpacity: 0.2,
   shadowRadius: 2,
   elevation: 3,
@@ -270,10 +270,10 @@ const $dateNavRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 });
 
 // Date Scroll Row (Giữ nguyên)
-const $dateRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $dateRow: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flexDirection: 'row',
   gap: spacing.xs,
-  paddingBottom: spacing.xs,
+  paddingBottom: spacing.xs
 });
 
 const $dateItem: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
@@ -346,9 +346,10 @@ const $codeCardWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   borderRadius: spacing.lg,
   padding: spacing.md,
   flexDirection: 'column',
-  shadowColor: colors.palette.neutral400,
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.25,
+  //box shadow
+  shadowColor: colors.palette.primary500,
+  shadowOffset: { width: 5, height: 30 },
+  shadowOpacity: 0.8,
   shadowRadius: 3.84,
   elevation: 5,
 });
