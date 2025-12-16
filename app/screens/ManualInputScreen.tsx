@@ -1,4 +1,4 @@
-// Create ManualInputScreen.tsx
+// Update ManualInputScreen.tsx
 import React, { useState } from 'react';
 import { View, ViewStyle, TouchableOpacity, ScrollView, TextInput, TextStyle } from 'react-native';
 import { useAppTheme } from '@/theme/context';
@@ -8,12 +8,16 @@ import { Screen } from '@/components/Screen';
 import { Text } from "@/components/Text"
 import { Header } from '@/components/Header';
 import IconBack from "@assets/svg/arrow-left.svg";
-import IconDownArrow from "@assets/svg/arrow-left.svg"; // Giữ lại tên biến của bạn
+import IconLeftArrow from "@assets/svg/arrow-left.svg";
+import IconRightArrow from "@assets/svg/arrow-right.svg";
 import IconTicket from "@assets/svg/my-ticket.svg"; // Giả định icon vé
-import IconClear from "@assets/svg/find.svg"; // Icon Xóa (Giả định)
-import IconSearch from "@assets/svg/find.svg"; // Icon Dò ngay (Giả định)
+import IconClear from "@assets/svg/backspace.svg"; // Icon Xóa
+import IconSearch from "@assets/svg/search.svg"; // Icon Dò ngay
+import IconCheckCircle from "@assets/svg/check-circle.svg"; // Icon Dò ngay
+import IconCalendar from "@assets/svg/calendar.svg"; // Icon Lịch
+import IconLuckyStar from "@assets/svg/lucky-star.svg"; // Icon Lịch
 
-// Dữ liệu mẫu
+// Dữ liệu mẫu (Cập nhật để hiển thị theo miền)
 const dateData = [
   { day: 'T2', date: 22 },
   { day: 'T3', date: 23 },
@@ -25,16 +29,31 @@ const dateData = [
 ];
 
 const cityData = [
-  { code: 'HCM', name: 'TP. Hồ Chí Minh', day: 'THỨ 7', isSelected: true },
-  { code: 'LA', name: 'Long An' },
-  { code: 'BP', name: 'Bình Phước' },
-  { code: 'HG', name: 'Hậu Giang' },
-  { code: 'VT', name: 'Vũng Tàu' },
+  {
+    region: 'Miền Nam', color: '#DC2626', data: [
+      { code: 'HCM', name: 'TP. HCM' },
+      { code: 'LA', name: 'Long An' },
+      { code: 'BP', name: 'Bình Phước' },
+    ]
+  },
+  {
+    region: 'Miền Trung', color: '#F59E0B', data: [
+      { code: 'DN', name: 'Đà Nẵng' },
+      { code: 'QNG', name: 'Quảng Ngãi' },
+      { code: 'ĐNÔ', name: 'Đắk Nông' },
+    ]
+  },
+  {
+    region: 'Miền Bắc', color: '#10B981', data: [
+      { code: 'HN', name: 'Hà Nội' },
+    ]
+  },
 ];
 
 export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = function ManualInputScreen(_props) {
   const { themed, theme: { colors, spacing } } = useAppTheme();
   const [ticketCode, setTicketCode] = useState<string[]>(['', '', '', '', '', '']); // 6 ô nhập
+  const [selectedCities, setSelectedCities] = useState<string>(cityData[0].data[0].name); // State for selected lottery stations
   const { navigation } = _props;
 
   const BackIcon = () => (
@@ -43,7 +62,7 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
     </TouchableOpacity>
   );
 
-  // Hàm render 6 ô nhập mã
+  // Hàm render 6 ô nhập mã (Giữ nguyên)
   const renderCodeInput = () => {
     return (
       <View style={themed($codeInputWrapper)}>
@@ -58,44 +77,53 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
               const newCode = [...ticketCode];
               newCode[index] = text;
               setTicketCode(newCode);
-
-              // Auto focus next input (Logic đơn giản)
-              if (text && index < 5) {
-                // Logic focus vào ô tiếp theo cần sử dụng useRef
-              }
             }}
             value={value}
           />
         ))}
-        <TouchableOpacity onPress={() => setTicketCode(['', '', '', '', '', ''])} activeOpacity={0.7}>
-          <IconClear width={20} height={20} color={colors.palette.neutral500} style={{ marginLeft: spacing.sm }} />
+        <TouchableOpacity onPress={() => setTicketCode(['', '', '', '', '', ''])} activeOpacity={0.7} style={themed($clearButton)}>
+          <IconClear width={20} height={20} color={colors.palette.neutral500} />
         </TouchableOpacity>
       </View>
     );
   };
 
-  // Hàm render các đài quay
-  const renderCityChips = () => (
-    <View style={themed($cityChipRow)}>
-      {cityData.map(city => {
-        const isSelected = city.isSelected;
-        return (
-          <TouchableOpacity
-            key={city.code}
-            style={themed([$cityChip, isSelected && $activeCityChip])}
-            activeOpacity={0.7}
-          >
-            <View style={themed([$cityChipCode, { backgroundColor: isSelected ? colors.surface : colors.palette.neutral300 }])}>
-              <Text text={city.code} weight='bold' size="sm" style={{ color: isSelected ? colors.primary : colors.text }} />
-            </View>
-            <View style={themed($cityChipTextWrapper)}>
+  // Toggle city selection
+  const toggleCitySelection = (station: string) => {
+    setSelectedCities(station);
+  };
+
+  // Hàm render các đài quay theo miền
+  const renderCityChips = (regionData: typeof cityData[0]) => (
+    <View key={regionData.region}>
+      {/* Header Miền */}
+      <View style={themed($regionHeader)}>
+        <View style={[themed($regionIndicator), { backgroundColor: regionData.color }]} />
+        <Text text={regionData.region} weight='semiBold' size="md" />
+        <View style={{ flex: 3, backgroundColor: colors.palette.neutral300, height: 0.5, marginLeft: spacing.lg }}></View>
+      </View>
+
+      {/* Danh sách đài quay */}
+      <View style={themed($cityChipRow)}>
+        {regionData.data.map(city => {
+          const isSelected = selectedCities == city.name;
+          return (
+            <TouchableOpacity
+              key={city.code}
+              style={themed([$cityChip, isSelected && $activeCityChip])}
+              activeOpacity={0.7}
+              onPress={() => toggleCitySelection(city.name)}
+            >
               <Text text={city.name} weight='semiBold' size="sm" />
-              {isSelected && <Text text={city.day} weight='light' size="xs" style={{ color: colors.palette.neutral600 }} />}
-            </View>
-            {isSelected && <Text style={{ marginLeft: spacing.xxs }}>✅</Text>}
-          </TouchableOpacity>
-        );
-      })}
+              {isSelected && (
+                <View style={themed($checkBadge)}>
+                  <IconCheckCircle width={16} height={16} color={colors.primary} />
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 
@@ -112,72 +140,79 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
 
       <Screen preset="scroll" contentContainerStyle={themed($screenContentContainer)}>
 
-        {/* 1. Ngày mở thưởng */}
+        {/* 1. Ngày mở thưởng (Date Picker Card) */}
         <View style={themed($sectionHeader)}>
-          <Text text='Ngày mở thưởng' weight='semiBold' size="md" />
-          <TouchableOpacity style={themed($monthDropdown)} activeOpacity={0.7}>
-            <Text text='Tháng 7, 2024' weight='semiBold' size="sm" style={{ color: colors.primary }} />
-            <IconDownArrow width={10} height={10} color={colors.primary} style={{ marginLeft: spacing.xs, transform: [{ rotate: '-90deg' }] }} />
-          </TouchableOpacity>
+          <Text text='Chọn ngày xổ' weight='bold' size="md" />
         </View>
+        <View style={themed($datePickerCard)}>
+          <View style={themed($datePickerHeader)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <IconCalendar width={20} height={20} color={colors.primary} />
+              <Text text='Thứ Bảy, 27 tháng 7, 2024' weight='bold' size="md" style={{ color: colors.primary }} />
+            </View>
+            <View style={themed($dateNavRow)}>
+              <TouchableOpacity style={themed($backPrevious)}>
+                <IconLeftArrow width={14} height={14} color={colors.palette.neutral700} />
+              </TouchableOpacity>
+              <TouchableOpacity style={themed($backNext)}>
+                <IconRightArrow width={14} height={14} color={colors.palette.neutral700} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-        {/* Date Scroll Row */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={themed($dateRow)}
-        >
-          {dateData.map((dayItem, index) => (
-            <TouchableOpacity
-              key={index}
-              style={themed([$dateItem, dayItem.isSelected && $activeDateItem])}
-              activeOpacity={0.7}
-            >
-              <Text
-                text={dayItem.day}
-                weight='bold'
-                size="sm"
-                style={{ color: dayItem.isSelected ? colors.surface : colors.text }}
-              />
-              <Text
-                text={dayItem.date.toString()}
-                weight='bold'
-                size="lg"
-                style={{ color: dayItem.isSelected ? colors.surface : dayItem.isHoliday ? colors.primary : colors.text }}
-              />
-              {dayItem.isHoliday && dayItem.isSelected && <View style={themed($dateDot)} />}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          {/* Date Scroll Row */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={themed($dateRow)}
+          >
+            {dateData.map((dayItem, index) => (
+              <TouchableOpacity
+                key={index}
+                style={themed([$dateItem, dayItem.isSelected && $activeDateItem])}
+                activeOpacity={0.7}
+              >
+                <Text
+                  text={dayItem.day}
+                  weight='bold'
+                  size="sm"
+                  style={{ color: dayItem.isSelected ? colors.surface : colors.text }}
+                />
+                <Text
+                  text={dayItem.date.toString()}
+                  weight='bold'
+                  size="lg" 
+                  style={{ color: dayItem.isSelected ? colors.surface : colors.text }}
+                />
+                {dayItem.isHoliday && dayItem.isSelected && <View style={themed($dateDot)} />}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* 2. Đài quay thưởng */}
         <View style={themed($sectionHeader)}>
-          <Text text='Đài quay thưởng' weight='semiBold' size="md" />
-          <Text text='Miền Nam' weight='semiBold' size="sm" style={{ color: colors.palette.neutral500 }} />
+          <Text text='Đài quay thưởng' weight='bold' size="md" />
+          <Text text={`${cityData.length} đài mở thưởng`} weight='semiBold' size="sm" style={{ color: colors.palette.neutral500 }} />
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: spacing.md }}
-        >
-          {renderCityChips()}
-        </ScrollView>
+        <View>
+          {cityData.map(renderCityChips)}
+        </View>
 
         {/* 3. Mã dự thưởng */}
         <View style={themed($sectionHeader)}>
-          <Text text='Mã dự thưởng' weight='semiBold' size="md" />
+          <Text text='Mã dự thưởng' weight='bold' size="md" />
         </View>
 
         <View style={themed($codeCardWrapper)}>
           {renderCodeInput()}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: spacing.xs }}>
+
           <Text text='Nhập đủ 6 số trên vé' weight='light' size="xs" style={{ color: colors.palette.neutral500, alignSelf: 'flex-start', marginLeft: spacing.md }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.xs }}>
-            <TouchableOpacity activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text text='May mắn' weight='semiBold' size="sm" style={{ color: colors.primary, marginRight: spacing.xxs }} />
-              <IconBack width={12} height={12} color={colors.primary} style={{ transform: [{ rotate: '180deg' }] }} />
-            </TouchableOpacity>
+            <IconLuckyStar width={16} height={16} color={colors.gold} />
           </View>
+
         </View>
 
       </Screen>
@@ -198,7 +233,7 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
 
 const $screenContentContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
-  paddingBottom: spacing.xxxl * 2, // Để chừa chỗ cho floating button
+  paddingBottom: spacing.xxxl * 2,
 });
 
 const $sectionHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -206,35 +241,50 @@ const $sectionHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: 'space-between',
   alignItems: 'center',
   marginTop: spacing.md,
-  marginBottom: spacing.sm,
+  marginBottom: spacing.xs,
 });
 
-const $monthDropdown: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+// --- Date Picker Card ---
+const $datePickerCard: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  backgroundColor: colors.surface,
+  borderRadius: spacing.lg,
+  padding: spacing.md,
+  // Shadow style tương tự các card khác
+  shadowColor: colors.palette.neutral400,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 2,
+  elevation: 3,
+});
+
+const $datePickerHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
+  justifyContent: 'space-between',
   alignItems: 'center',
+  marginBottom: spacing.md,
+  paddingHorizontal: spacing.sm,
 });
 
-// --- Date Selector ---
+const $dateNavRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: 'row',
+});
+
+// Date Scroll Row (Giữ nguyên)
 const $dateRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
   gap: spacing.xs,
-  paddingBottom: spacing.md,
+  paddingBottom: spacing.xs,
 });
 
 const $dateItem: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   width: 50,
   height: 75,
   borderRadius: spacing.md,
-  backgroundColor: colors.surface,
+  backgroundColor: colors.surface, // Background trắng trong card
   justifyContent: 'center',
   alignItems: 'center',
   gap: spacing.xxs,
-  // Box shadow tương tự HomeScreen
-  shadowColor: colors.palette.neutral400,
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.2,
-  shadowRadius: 2,
-  elevation: 3,
+  // Bỏ shadow cho item trong card
 });
 
 const $activeDateItem: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -250,17 +300,35 @@ const $dateDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   bottom: 5,
 });
 
-// --- City Chip Selector ---
+// --- Region/City Selector ---
+const $regionHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: spacing.xs,
+  marginTop: spacing.xs,
+});
+
+const $regionIndicator: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: 4,
+  height: 18,
+  borderRadius: 2,
+  marginRight: spacing.xs,
+});
+
 const $cityChipRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
-  flexWrap: 'wrap', // Cho phép xuống dòng nếu cần
+  flexWrap: 'wrap',
   gap: spacing.sm,
+  marginBottom: spacing.xs,
 });
 
 const $cityChip: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flexDirection: 'row',
   alignItems: 'center',
-  paddingRight: spacing.sm,
+  justifyContent: 'center',
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.xs,
   borderRadius: spacing.xxl,
   backgroundColor: colors.surface,
   borderWidth: 1,
@@ -271,27 +339,13 @@ const $activeCityChip: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderColor: colors.primary,
 });
 
-const $cityChipCode: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  paddingVertical: spacing.xxs,
-  paddingHorizontal: spacing.sm,
-  borderRadius: spacing.xxl,
-  marginRight: spacing.xs,
-});
 
-const $cityChipTextWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: 'column',
-  alignItems: 'flex-start',
-  paddingVertical: spacing.xs,
-});
-
-
-// --- Code Input ---
+// --- Code Input (Giữ nguyên) ---
 const $codeCardWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   backgroundColor: colors.surface,
   borderRadius: spacing.lg,
   padding: spacing.md,
   flexDirection: 'column',
-  // Shadow style tương tự HomeScreen
   shadowColor: colors.palette.neutral400,
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.25,
@@ -319,7 +373,7 @@ const $codeBox: ThemedStyle<TextStyle> = ({ spacing, colors }) => ({
   color: colors.text,
 });
 
-// --- Footer Button ---
+// --- Footer Button (Giữ nguyên) ---
 const $footerButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   position: 'absolute',
   bottom: spacing.md,
@@ -331,10 +385,52 @@ const $footerButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flexDirection: 'row',
   justifyContent: 'center',
   alignItems: 'center',
-  // Shadow cho Floating button
   shadowColor: colors.primary,
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.3,
   shadowRadius: 4.65,
   elevation: 8,
+});
+const $clearButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  borderRadius: 20,
+  backgroundColor: colors.palette.neutral200,
+  justifyContent: 'center',
+  alignItems: 'center',
+  height: 40,
+  width: 40,
+  marginLeft: spacing.sm,
+});
+
+const $backPrevious: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  borderTopLeftRadius: 20,
+  borderBottomLeftRadius: 20,
+  backgroundColor: colors.palette.neutral200,
+  justifyContent: 'center',
+  alignItems: 'center',
+
+  paddingVertical: spacing.md,
+  paddingHorizontal: spacing.sm,
+  paddingRight: spacing.md,
+});
+
+const $backNext: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  borderTopRightRadius: 20,
+  borderBottomRightRadius: 20,
+  backgroundColor: colors.palette.neutral200,
+  justifyContent: 'center',
+  alignItems: 'center',
+
+  paddingVertical: spacing.md,
+  paddingHorizontal: spacing.sm,
+  paddingLeft: spacing.md,
+});
+
+const $checkBadge: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  position: 'absolute',
+  top: -6,
+  right: 4,
+  marginLeft: spacing.xs,
+  backgroundColor: colors.surface,
+  borderRadius: 8,
+  padding: 2,
 });

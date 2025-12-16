@@ -185,7 +185,7 @@ const $scheduleCard: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
 
 const $rowWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flexDirection: 'row',
-  paddingVertical: spacing.sm,
+  paddingVertical: spacing.xs,
   paddingHorizontal: spacing.sm,
   borderBottomWidth: 1,
   borderBottomColor: colors.palette.neutral200, // Line ngăn cách mờ
