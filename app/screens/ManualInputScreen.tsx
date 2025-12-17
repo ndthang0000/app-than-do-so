@@ -16,6 +16,7 @@ import IconSearch from "@assets/svg/search.svg";
 import IconCheckCircle from "@assets/svg/check-circle.svg";
 import IconCalendar from "@assets/svg/calendar.svg";
 import IconLuckyStar from "@assets/svg/lucky-star.svg";
+import LinearGradient from "react-native-linear-gradient"
 
 // Lấy chiều rộng màn hình và tính toán vị trí cuộn
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -104,7 +105,6 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
   const { themed, theme: { colors, spacing } } = useAppTheme();
   const [ticketCode, setTicketCode] = useState<string>(''); // Đổi thành string thay vì array
   const [selectedCities, setSelectedCities] = useState<string>(cityData[0].data[0].name);
-  console.log("re-render")
   // State chính: Chỉ quản lý ngày được chọn.
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -115,6 +115,27 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
   // UseMemo để tính toán 3 tuần chỉ khi selectedDate thay đổi.
   // **Đây là bước quan trọng để giảm Re-render.**
   const visibleWeeks = useMemo(() => getThreeWeeks(selectedDate), [selectedDate]);
+
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+
+  // Hàm xử lý khi text thay đổi
+  const handleTextChange = (text: string) => {
+    const numbersOnly = text.replace(/[^0-9]/g, '');
+    setTicketCode(numbersOnly);
+    // Sau khi cập nhật text, đẩy con trỏ về cuối chuỗi mới
+    if (numbersOnly.length == 6) {
+      inputRef.current?.blur(); // Ẩn bàn phím khi nhập đủ 6 số
+    }
+    setSelection({
+      start: numbersOnly.length,
+      end: numbersOnly.length,
+    });
+  };
+
+  const handleClearInput = () => {
+    setTicketCode('');
+    setSelection({ start: 0, end: 0 });
+  }
 
   // Cuộn về vị trí giữa sau khi selectedDate thay đổi
   useEffect(() => {
@@ -183,66 +204,7 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
     </TouchableOpacity>
   );
 
-  const renderCodeInput = () => {
-    const codeArray = ticketCode.split('');
-    while (codeArray.length < 6) {
-      codeArray.push('');
-    }
 
-    return (
-      <TouchableOpacity
-        style={themed($codeInputWrapper)}
-        activeOpacity={1}
-        onPress={() => inputRef.current?.focus()} // Khi chạm vào bất kỳ đâu trong wrapper, gọi focus
-      >
-        <IconTicket width={24} height={24} color={colors.palette.neutral500} style={{ marginRight: spacing.sm }} />
-
-        {/* FIX: Đổi style TextInput ẩn.
-                    Đặt nó ra khỏi vùng hiển thị nhưng vẫn giữ trong luồng (Không dùng position: absolute và opacity: 0)
-                    Nếu cần đảm bảo nó không gây ảnh hưởng đến layout: 
-                    Dùng height/width rất nhỏ, overflow: 'hidden'
-                */}
-        <TextInput
-          ref={inputRef}
-          style={themed($hiddenInput)} // Sử dụng style mới để ẩn
-          maxLength={6}
-          keyboardType='number-pad'
-          value={ticketCode}
-          onChangeText={(text) => {
-            const numbersOnly = text.replace(/[^0-9]/g, '');
-            setTicketCode(numbersOnly);
-          }}
-          autoFocus={false}
-        />
-
-        {/* Hiển thị 6 ô số */}
-        {codeArray.map((value, index) => (
-          <View
-            key={index}
-            style={themed($codeBox)}
-          >
-            <Text
-              text={value}
-              weight='bold'
-              size='xxl'
-              style={{ color: colors.text }}
-            />
-          </View>
-        ))}
-
-        <TouchableOpacity
-          onPress={() => {
-            setTicketCode('');
-            inputRef.current?.focus(); // Đảm bảo focus sau khi xóa
-          }}
-          activeOpacity={0.7}
-          style={themed($clearButton)}
-        >
-          <IconClear width={20} height={20} color={colors.palette.neutral500} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    );
-  };
 
   const toggleCitySelection = (station: string) => {
     setSelectedCities(station);
@@ -283,6 +245,8 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
 
   // --- JSX RENDER CHÍNH ---
 
+  const validInput = ticketCode.length === 6;
+
   return (
     <>
       <Header
@@ -302,12 +266,12 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
         </View>
         <View style={themed($datePickerCard)}>
           <View style={themed($datePickerHeader)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xxs }}>
               <IconCalendar width={20} height={20} color={colors.primary} />
               <Text
                 text={selectedDate.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 weight='bold'
-                size="md"
+                size="sm"
                 style={{ color: colors.primary }}
               />
             </View>
@@ -382,21 +346,69 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
           <Text text='Mã dự thưởng' weight='bold' size="md" />
         </View>
 
-        <View style={themed($codeCardWrapper)}>
-          {renderCodeInput()}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: spacing.xs }}>
-            <Text text='Nhập đủ 6 số trên vé' weight='light' size="xs" style={{ color: colors.palette.neutral500, alignSelf: 'flex-start', marginLeft: spacing.md }} />
-            <IconLuckyStar width={16} height={16} color={colors.gold} />
-          </View>
-        </View>
+        {/* code-input */}
+        <TouchableOpacity activeOpacity={0.5} onPress={() => inputRef.current?.focus()}>
+          <LinearGradient style={themed($codeCardWrapper)} colors={[colors.palette.primary200, colors.palette.accent300]} // Màu gradient nhẹ nhàng
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
 
+            <View style={themed($inputContainer)}>
+              <View style={themed($iconTicketWrapper)}>
+                <IconTicket
+                  width={24}
+                  height={24}
+                  color={colors.primary}
+                />
+              </View>
+
+              <TextInput
+                ref={inputRef}
+                style={themed($singleTextInput)}
+                value={ticketCode}
+                onChangeText={handleTextChange}
+                placeholder="000000"
+                placeholderTextColor={colors.palette.neutral400}
+                keyboardType="number-pad"
+                maxLength={6}
+                underlineColorAndroid="transparent" // Xóa viền dưới mặc định trên Android
+                selectionColor={colors.primary} // Đổi màu dấu nhấp nháy thành màu chủ đạo của bạn
+                cursorColor={colors.primary}
+                selection={selection}
+
+
+              />
+
+              <TouchableOpacity
+                onPress={handleClearInput}
+                style={themed($clearIconWrapper)}
+              >
+                {ticketCode.length > 0 &&
+                  <IconClear width={20} height={20} color={colors.palette.neutral500} />
+                }
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xxs, gap: spacing.xxs }}>
+              <Text text='Nhập đủ 6 số trên vé' weight='light' size="xs" style={{ color: colors.palette.neutral500, alignSelf: 'flex-start', marginLeft: spacing.md }} />
+              <IconLuckyStar width={16} height={16} color={colors.gold} />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* error text when user input from 1-5 code */}
+        {ticketCode.length > 0 && ticketCode.length < 6 && (
+          <Text text='Vui lòng nhập đủ 6 chữ số trên vé để dò kết quả.' weight='regular' size="sm" style={{ color: colors.error, marginTop: spacing.xs }} />
+        )}
       </Screen>
 
-      {/* Floating Dò Ngay Button */}
-      <TouchableOpacity style={themed($footerButton)} activeOpacity={0.8}>
-        <IconSearch width={20} height={20} color={colors.surface} />
-        <Text text='Dò ngay' weight='bold' size="lg" style={{ color: colors.surface, marginLeft: spacing.xs }} />
-      </TouchableOpacity>
+      {validInput && (
+        <TouchableOpacity style={themed([$footerButton, { backgroundColor: validInput ? colors.primary : colors.palette.neutral300 }])} activeOpacity={0.8} disabled={!validInput}>
+          <IconSearch width={20} height={20} color={colors.surface} />
+          <Text text='Dò ngay' weight='bold' size="lg" style={{ color: colors.surface, marginLeft: spacing.xs }} />
+        </TouchableOpacity>
+      )}
+
+
     </>
   );
 }
@@ -442,6 +454,9 @@ const $datePickerHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $dateNavRow: ThemedStyle<ViewStyle> = ({ }) => ({
   flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 2
 });
 
 
@@ -454,6 +469,8 @@ const $backPrevious: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   paddingVertical: spacing.md,
   paddingHorizontal: spacing.sm,
   paddingRight: spacing.md,
+  borderRightWidth: 0.5,
+  borderRightColor: colors.separator,
 });
 
 const $backNext: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
@@ -516,7 +533,7 @@ const $regionIndicator: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $cityChipRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
   flexWrap: 'wrap',
-  gap: spacing.sm,
+  gap: spacing.xxs,
   marginBottom: spacing.xs,
 });
 
@@ -549,19 +566,10 @@ const $footerButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   justifyContent: 'center',
   alignItems: 'center',
   shadowColor: colors.primary,
-  shadowOffset: { width: 0, height: 4 },
+  shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.3,
   shadowRadius: 4.65,
   elevation: 8,
-});
-const $clearButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  borderRadius: 20,
-  backgroundColor: colors.palette.neutral200,
-  justifyContent: 'center',
-  alignItems: 'center',
-  height: 40,
-  width: 40,
-  marginLeft: spacing.sm,
 });
 
 
@@ -577,37 +585,50 @@ const $checkBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
 
 
 const $codeCardWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  // ... (Giữ nguyên)
+  borderRadius: spacing.lg,
+  flexDirection: 'column',
+  paddingHorizontal: spacing.sm,
+  paddingVertical: spacing.lg,
+  gap: spacing.xs,
+  // Shadow style tương tự HomeScreen
+  shadowColor: colors.palette.primary300,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 3.84,
+  elevation: 5,
 });
 
-// FIX: Bọc $codeInputWrapper bằng TouchableOpacity và đảm bảo nó focus input
-const $codeInputWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+
+const $inputContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
-  justifyContent: 'center',
   alignItems: 'center',
+  paddingHorizontal: spacing.sm,
   paddingVertical: spacing.sm,
+  borderRadius: spacing.md, // Bo góc cho vùng gradient
+  height: 60,
+  justifyContent: 'space-between'
 });
 
-const $codeBox: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  // ... (Giữ nguyên)
-  width: 40,
-  height: 50,
-  borderWidth: 1,
-  borderColor: colors.palette.neutral400,
-  borderRadius: spacing.sm,
+const $iconTicketWrapper: ThemedStyle<ViewStyle> = ({ }) => ({
+  flex: 1
+});
+
+const $singleTextInput: ThemedStyle<TextStyle> = ({ colors }) => ({
+  flex: 8,
+  fontSize: 32,
+  fontWeight: 'bold',
+  color: colors.tint,
+  textAlign: 'center',
+  letterSpacing: 8, // Tạo khoảng cách giữa các con số giống như các ô rời
+  // paddingLeft: 8,
+  paddingVertical: 0,
+  borderWidth: 0, // Đảm bảo không có viền
+  height: 70,
+});
+
+const $clearIconWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  padding: spacing.xs,
+  flex: 1,
   justifyContent: 'center',
   alignItems: 'center',
-  marginHorizontal: spacing.xxs,
-  backgroundColor: colors.surface,
-});
-
-// FIX: Style mới cho TextInput ẩn để đảm bảo nó không chặn tương tác
-const $hiddenInput: ThemedStyle<TextStyle> = () => ({
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  left: 0,
-  top: 0,
-  color: 'transparent', // Màu chữ trong suốt
-  backgroundColor: 'transparent',
 });
