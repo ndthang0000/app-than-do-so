@@ -84,6 +84,7 @@ export function MainNavigator() {
           name="Scan"
           component={ScanScreen}
           options={{
+            tabBarStyle: { display: 'none' },
             tabBarLabel: ({ focused }) => {
               return <Text text="" style={themed([$tabBarLabel, { color: focused ? colors.tint : colors.tintInactive }])} />
             },

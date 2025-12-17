@@ -397,7 +397,7 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
 
         {/* error text when user input from 1-5 code */}
         {ticketCode.length > 0 && ticketCode.length < 6 && (
-          <Text text='Vui lòng nhập đủ 6 chữ số trên vé để dò kết quả.' weight='regular' size="sm" style={{ color: colors.error, marginTop: spacing.xs }} />
+          <Text text='Vui lòng nhập đủ 6 chữ số trên vé để dò kết quả.' weight='medium' size="sm" style={{ color: colors.error, marginTop: spacing.xs }} />
         )}
       </Screen>
 
