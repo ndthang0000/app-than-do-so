@@ -1,33 +1,29 @@
-// Update ManualInputScreen.tsx
-import React, { useState } from 'react';
-import { View, ViewStyle, TouchableOpacity, ScrollView, TextInput, TextStyle } from 'react-native';
+// Update ManualInputScreen.tsx (Tối ưu hóa Re-render xuống 2 lần)
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { View, ViewStyle, TouchableOpacity, ScrollView, TextInput, TextStyle, Dimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useAppTheme } from '@/theme/context';
 import type { ThemedStyle } from '@/theme/types';
-import { AppStackScreenProps } from '@/navigators/navigationTypes'; // Giả định
+import { AppStackScreenProps } from '@/navigators/navigationTypes';
 import { Screen } from '@/components/Screen';
 import { Text } from "@/components/Text"
 import { Header } from '@/components/Header';
 import IconBack from "@assets/svg/arrow-left.svg";
 import IconLeftArrow from "@assets/svg/arrow-left.svg";
 import IconRightArrow from "@assets/svg/arrow-right.svg";
-import IconTicket from "@assets/svg/my-ticket.svg"; // Giả định icon vé
-import IconClear from "@assets/svg/backspace.svg"; // Icon Xóa
-import IconSearch from "@assets/svg/search.svg"; // Icon Dò ngay
-import IconCheckCircle from "@assets/svg/check-circle.svg"; // Icon Dò ngay
-import IconCalendar from "@assets/svg/calendar.svg"; // Icon Lịch
-import IconLuckyStar from "@assets/svg/lucky-star.svg"; // Icon Lịch
+import IconTicket from "@assets/svg/my-ticket.svg";
+import IconClear from "@assets/svg/backspace.svg";
+import IconSearch from "@assets/svg/search.svg";
+import IconCheckCircle from "@assets/svg/check-circle.svg";
+import IconCalendar from "@assets/svg/calendar.svg";
+import IconLuckyStar from "@assets/svg/lucky-star.svg";
 
-// Dữ liệu mẫu (Cập nhật để hiển thị theo miền)
-const dateData = [
-  { day: 'T2', date: 22 },
-  { day: 'T3', date: 23 },
-  { day: 'T4', date: 24 },
-  { day: 'T5', date: 25 },
-  { day: 'T6', date: 26 },
-  { day: 'T7', date: 27, isSelected: true, isHoliday: true },
-  { day: 'CN', date: 28 },
-];
+// Lấy chiều rộng màn hình và tính toán vị trí cuộn
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CONTAINER_PADDING = 32; // Tương đương spacing.md * 2 (16*2)
+const WEEK_WIDTH = SCREEN_WIDTH - CONTAINER_PADDING;
+const MIDDLE_SCROLL_POS = WEEK_WIDTH; // Vị trí cuộn tuần hiện tại (index 1)
 
+// Dữ liệu mẫu (Giữ nguyên)
 const cityData = [
   {
     region: 'Miền Nam', color: '#DC2626', data: [
@@ -50,11 +46,136 @@ const cityData = [
   },
 ];
 
+// --- LOGIC XỬ LÝ NGÀY THÁNG ---
+interface WeekDateItem {
+  date: Date;
+  dayName: string;
+  isHoliday: boolean;
+}
+
+const getMonday = (d: Date): Date => {
+  d = new Date(d);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+};
+
+const generateWeekDates = (startDate: Date): WeekDateItem[] => {
+  const monday = getMonday(startDate);
+  const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const week: WeekDateItem[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+
+    const dayOfWeekIndex = date.getDay();
+
+    week.push({
+      date,
+      dayName: dayNames[(dayOfWeekIndex === 0 ? 6 : dayOfWeekIndex - 1)],
+      isHoliday: dayOfWeekIndex === 0 || dayOfWeekIndex === 6,
+    });
+  }
+  return week;
+};
+
+// Hàm tính toán và trả về 3 tuần (Tuần trước, Hiện tại, Tuần sau)
+const getThreeWeeks = (centerDate: Date): WeekDateItem[][] => {
+  const currentMonday = getMonday(centerDate);
+
+  // Tuần trước
+  const prevDate = new Date(currentMonday);
+  prevDate.setDate(currentMonday.getDate() - 7);
+  const prevWeek = generateWeekDates(prevDate);
+
+  // Tuần hiện tại
+  const currentWeek = generateWeekDates(centerDate);
+
+  // Tuần sau
+  const nextDate = new Date(currentMonday);
+  nextDate.setDate(currentMonday.getDate() + 7);
+  const nextWeek = generateWeekDates(nextDate);
+
+  return [prevWeek, currentWeek, nextWeek];
+}
+
 export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = function ManualInputScreen(_props) {
   const { themed, theme: { colors, spacing } } = useAppTheme();
-  const [ticketCode, setTicketCode] = useState<string[]>(['', '', '', '', '', '']); // 6 ô nhập
-  const [selectedCities, setSelectedCities] = useState<string>(cityData[0].data[0].name); // State for selected lottery stations
+  const [ticketCode, setTicketCode] = useState<string>(''); // Đổi thành string thay vì array
+  const [selectedCities, setSelectedCities] = useState<string>(cityData[0].data[0].name);
+  console.log("re-render")
+  // State chính: Chỉ quản lý ngày được chọn.
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null); // Ref cho TextInput ẩn
   const { navigation } = _props;
+
+  // UseMemo để tính toán 3 tuần chỉ khi selectedDate thay đổi.
+  // **Đây là bước quan trọng để giảm Re-render.**
+  const visibleWeeks = useMemo(() => getThreeWeeks(selectedDate), [selectedDate]);
+
+  // Cuộn về vị trí giữa sau khi selectedDate thay đổi
+  useEffect(() => {
+    // Chỉ cuộn khi component đã được mount và có data
+    if (scrollViewRef.current && visibleWeeks.length === 3) {
+      // Sử dụng setTimeout(0) để đảm bảo việc cuộn diễn ra sau khi
+      // Re-render (lần 2) hoàn tất và ScrollView đã được bố cục lại
+      // với 3 tuần mới.
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ x: MIDDLE_SCROLL_POS, animated: false });
+      }, 0);
+    }
+  }, [selectedDate, visibleWeeks]); // Phụ thuộc vào selectedDate
+
+  // ------------------------------------------
+  // HÀM CHUYỂN TUẦN (SỬ DỤNG useCallback)
+  // ------------------------------------------
+
+  const changeWeek = useCallback((direction: 'PREV' | 'NEXT') => {
+    // Console.log ra sẽ chỉ thấy 1 lần gọi hàm này (Re-render 1)
+
+    const newDate = new Date(selectedDate);
+    if (direction === 'PREV') {
+      newDate.setDate(selectedDate.getDate() - 7);
+    } else {
+      newDate.setDate(selectedDate.getDate() + 7);
+    }
+
+    // Cập nhật state. Re-render lần 1.
+    setSelectedDate(newDate);
+  }, [selectedDate]);
+
+  const handlePreviousWeek = useCallback(() => changeWeek('PREV'), [changeWeek]);
+  const handleNextWeek = useCallback(() => changeWeek('NEXT'), [changeWeek]);
+
+  // ------------------------------------------
+  // XỬ LÝ VUỐT (SWIPE)
+  // ------------------------------------------
+
+  const handleScrollEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offset = event.nativeEvent.contentOffset.x;
+
+    // Vuốt sang trái (Chuyển Next Week)
+    if (offset > MIDDLE_SCROLL_POS + WEEK_WIDTH / 2) {
+      handleNextWeek();
+    }
+    // Vuốt sang phải (Chuyển Previous Week)
+    else if (offset < WEEK_WIDTH / 2) {
+      handlePreviousWeek();
+    }
+    // Cuộn về vị trí giữa (Tuần hiện tại) nếu không đủ lực vuốt
+    else {
+      scrollViewRef.current?.scrollTo({ x: MIDDLE_SCROLL_POS, animated: true });
+    }
+  }, [handleNextWeek, handlePreviousWeek]);
+
+  // ------------------------------------------
+  // CÁC HÀM RENDER KHÁC
+  // ------------------------------------------
+
+  // ... (Giữ nguyên các hàm BackIcon, renderCodeInput, toggleCitySelection, renderCityChips)
 
   const BackIcon = () => (
     <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5}>
@@ -62,38 +183,71 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
     </TouchableOpacity>
   );
 
-  // Hàm render 6 ô nhập mã (Giữ nguyên)
   const renderCodeInput = () => {
+    const codeArray = ticketCode.split('');
+    while (codeArray.length < 6) {
+      codeArray.push('');
+    }
+
     return (
-      <View style={themed($codeInputWrapper)}>
+      <TouchableOpacity
+        style={themed($codeInputWrapper)}
+        activeOpacity={1}
+        onPress={() => inputRef.current?.focus()} // Khi chạm vào bất kỳ đâu trong wrapper, gọi focus
+      >
         <IconTicket width={24} height={24} color={colors.palette.neutral500} style={{ marginRight: spacing.sm }} />
-        {ticketCode.map((value, index) => (
-          <TextInput
+
+        {/* FIX: Đổi style TextInput ẩn.
+                    Đặt nó ra khỏi vùng hiển thị nhưng vẫn giữ trong luồng (Không dùng position: absolute và opacity: 0)
+                    Nếu cần đảm bảo nó không gây ảnh hưởng đến layout: 
+                    Dùng height/width rất nhỏ, overflow: 'hidden'
+                */}
+        <TextInput
+          ref={inputRef}
+          style={themed($hiddenInput)} // Sử dụng style mới để ẩn
+          maxLength={6}
+          keyboardType='number-pad'
+          value={ticketCode}
+          onChangeText={(text) => {
+            const numbersOnly = text.replace(/[^0-9]/g, '');
+            setTicketCode(numbersOnly);
+          }}
+          autoFocus={false}
+        />
+
+        {/* Hiển thị 6 ô số */}
+        {codeArray.map((value, index) => (
+          <View
             key={index}
             style={themed($codeBox)}
-            maxLength={1}
-            keyboardType='numeric'
-            onChangeText={(text) => {
-              const newCode = [...ticketCode];
-              newCode[index] = text;
-              setTicketCode(newCode);
-            }}
-            value={value}
-          />
+          >
+            <Text
+              text={value}
+              weight='bold'
+              size='xxl'
+              style={{ color: colors.text }}
+            />
+          </View>
         ))}
-        <TouchableOpacity onPress={() => setTicketCode(['', '', '', '', '', ''])} activeOpacity={0.7} style={themed($clearButton)}>
+
+        <TouchableOpacity
+          onPress={() => {
+            setTicketCode('');
+            inputRef.current?.focus(); // Đảm bảo focus sau khi xóa
+          }}
+          activeOpacity={0.7}
+          style={themed($clearButton)}
+        >
           <IconClear width={20} height={20} color={colors.palette.neutral500} />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 
-  // Toggle city selection
   const toggleCitySelection = (station: string) => {
     setSelectedCities(station);
   };
 
-  // Hàm render các đài quay theo miền
   const renderCityChips = (regionData: typeof cityData[0]) => (
     <View key={regionData.region}>
       {/* Header Miền */}
@@ -127,6 +281,8 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
     </View>
   );
 
+  // --- JSX RENDER CHÍNH ---
+
   return (
     <>
       <Header
@@ -148,44 +304,65 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
           <View style={themed($datePickerHeader)}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <IconCalendar width={20} height={20} color={colors.primary} />
-              <Text text='Thứ Bảy, 27 tháng 7, 2024' weight='bold' size="md" style={{ color: colors.primary }} />
+              <Text
+                text={selectedDate.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                weight='bold'
+                size="md"
+                style={{ color: colors.primary }}
+              />
             </View>
             <View style={themed($dateNavRow)}>
-              <TouchableOpacity style={themed($backPrevious)}>
+              <TouchableOpacity style={themed($backPrevious)} onPress={handlePreviousWeek}>
                 <IconLeftArrow width={14} height={14} color={colors.palette.neutral700} />
               </TouchableOpacity>
-              <TouchableOpacity style={themed($backNext)}>
+              <TouchableOpacity style={themed($backNext)} onPress={handleNextWeek}>
                 <IconRightArrow width={14} height={14} color={colors.palette.neutral700} />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Date Scroll Row */}
+          {/* Date Scroll Row - Sử dụng ScrollView cho tính năng Swipe */}
           <ScrollView
+            ref={scrollViewRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={themed($dateRow)}
+            pagingEnabled={true}
+            decelerationRate="fast"
+            onMomentumScrollEnd={handleScrollEnd}
+            scrollEventThrottle={16}
+            contentContainerStyle={{ width: SCREEN_WIDTH * 3 - CONTAINER_PADDING * 3, paddingHorizontal: 0 }}
           >
-            {dateData.map((dayItem, index) => (
-              <TouchableOpacity
-                key={index}
-                style={themed([$dateItem, dayItem.isSelected && $activeDateItem])}
-                activeOpacity={0.7}
+            {visibleWeeks.map((week, weekIndex) => (
+              <View
+                key={weekIndex}
+                style={themed($dateRowScrollPage)}
               >
-                <Text
-                  text={dayItem.day}
-                  weight='bold'
-                  size="sm"
-                  style={{ color: dayItem.isSelected ? colors.surface : colors.text }}
-                />
-                <Text
-                  text={dayItem.date.toString()}
-                  weight='bold'
-                  size="lg" 
-                  style={{ color: dayItem.isSelected ? colors.surface : colors.text }}
-                />
-                {dayItem.isHoliday && dayItem.isSelected && <View style={themed($dateDot)} />}
-              </TouchableOpacity>
+                {week.map((dayItem, dayIndex) => {
+                  const isSelected = dayItem.date.toDateString() === selectedDate.toDateString();
+                  return (
+                    <TouchableOpacity
+                      key={dayIndex}
+                      style={themed([$dateItemFixed, isSelected && $activeDateItem])}
+                      activeOpacity={0.7}
+                      onPress={() => setSelectedDate(dayItem.date)}
+                    >
+                      <Text
+                        text={dayItem.dayName}
+                        weight='bold'
+                        size="sm"
+                        style={{ color: isSelected ? colors.surface : colors.text }}
+                      />
+                      <Text
+                        text={dayItem.date.getDate().toString()}
+                        weight='bold'
+                        size="lg"
+                        style={{ color: isSelected ? colors.surface : colors.text }}
+                      />
+                      {dayItem.isHoliday && isSelected && <View style={themed($dateDot)} />}
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
             ))}
           </ScrollView>
         </View>
@@ -208,11 +385,9 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
         <View style={themed($codeCardWrapper)}>
           {renderCodeInput()}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: spacing.xs }}>
-
-          <Text text='Nhập đủ 6 số trên vé' weight='light' size="xs" style={{ color: colors.palette.neutral500, alignSelf: 'flex-start', marginLeft: spacing.md }} />
+            <Text text='Nhập đủ 6 số trên vé' weight='light' size="xs" style={{ color: colors.palette.neutral500, alignSelf: 'flex-start', marginLeft: spacing.md }} />
             <IconLuckyStar width={16} height={16} color={colors.gold} />
           </View>
-
         </View>
 
       </Screen>
@@ -226,9 +401,10 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
   );
 }
 
+// ... (Giữ nguyên phần STYLES)
 
 // ==========================================================
-// STYLES
+// STYLES (Đã chỉnh sửa cho Swipe)
 // ==========================================================
 
 const $screenContentContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -244,12 +420,10 @@ const $sectionHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginBottom: spacing.xs,
 });
 
-// --- Date Picker Card ---
 const $datePickerCard: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   backgroundColor: colors.surface,
   borderRadius: spacing.lg,
-  padding: spacing.md,
-  // Shadow style tương tự các card khác
+  paddingVertical: spacing.md,
   shadowColor: colors.palette.primary300,
   shadowOffset: { width: 2, height: 5 },
   shadowOpacity: 0.2,
@@ -262,29 +436,52 @@ const $datePickerHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: 'space-between',
   alignItems: 'center',
   marginBottom: spacing.md,
+  paddingHorizontal: spacing.sm + 4,
+});
+
+
+const $dateNavRow: ThemedStyle<ViewStyle> = ({ }) => ({
+  flexDirection: 'row',
+});
+
+
+const $backPrevious: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  borderTopLeftRadius: 20,
+  borderBottomLeftRadius: 20,
+  backgroundColor: colors.palette.neutral200,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: spacing.md,
+  paddingHorizontal: spacing.sm,
+  paddingRight: spacing.md,
+});
+
+const $backNext: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  borderTopRightRadius: 20,
+  borderBottomRightRadius: 20,
+  backgroundColor: colors.palette.neutral200,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: spacing.md,
+  paddingHorizontal: spacing.sm,
+  paddingLeft: spacing.md,
+});
+
+const $dateRowScrollPage: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: SCREEN_WIDTH - spacing.md * 2,
+  flexDirection: 'row',
+  justifyContent: 'space-between',
   paddingHorizontal: spacing.sm,
 });
 
-const $dateNavRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: 'row',
-});
-
-// Date Scroll Row (Giữ nguyên)
-const $dateRow: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  flexDirection: 'row',
-  gap: spacing.xs,
-  paddingBottom: spacing.xs
-});
-
-const $dateItem: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  width: 50,
+const $dateItemFixed: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  width: '13%',
   height: 75,
   borderRadius: spacing.md,
-  backgroundColor: colors.surface, // Background trắng trong card
+  backgroundColor: colors.surface,
   justifyContent: 'center',
   alignItems: 'center',
   gap: spacing.xxs,
-  // Bỏ shadow cho item trong card
 });
 
 const $activeDateItem: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -300,7 +497,7 @@ const $dateDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   bottom: 5,
 });
 
-// --- Region/City Selector ---
+
 const $regionHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
   alignItems: 'center',
@@ -340,41 +537,6 @@ const $activeCityChip: ThemedStyle<ViewStyle> = ({ colors }) => ({
 });
 
 
-// --- Code Input (Giữ nguyên) ---
-const $codeCardWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  backgroundColor: colors.surface,
-  borderRadius: spacing.lg,
-  padding: spacing.md,
-  flexDirection: 'column',
-  //box shadow
-  shadowColor: colors.palette.primary500,
-  shadowOffset: { width: 5, height: 30 },
-  shadowOpacity: 0.8,
-  shadowRadius: 3.84,
-  elevation: 5,
-});
-
-const $codeInputWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingVertical: spacing.sm,
-});
-
-const $codeBox: ThemedStyle<TextStyle> = ({ spacing, colors }) => ({
-  width: 40,
-  height: 50,
-  borderWidth: 1,
-  borderColor: colors.palette.neutral400,
-  borderRadius: spacing.sm,
-  textAlign: 'center',
-  fontSize: 24,
-  fontWeight: 'bold',
-  marginHorizontal: spacing.xxs,
-  color: colors.text,
-});
-
-// --- Footer Button (Giữ nguyên) ---
 const $footerButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   position: 'absolute',
   bottom: spacing.md,
@@ -402,36 +564,50 @@ const $clearButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   marginLeft: spacing.sm,
 });
 
-const $backPrevious: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  borderTopLeftRadius: 20,
-  borderBottomLeftRadius: 20,
-  backgroundColor: colors.palette.neutral200,
-  justifyContent: 'center',
-  alignItems: 'center',
 
-  paddingVertical: spacing.md,
-  paddingHorizontal: spacing.sm,
-  paddingRight: spacing.md,
-});
-
-const $backNext: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  borderTopRightRadius: 20,
-  borderBottomRightRadius: 20,
-  backgroundColor: colors.palette.neutral200,
-  justifyContent: 'center',
-  alignItems: 'center',
-
-  paddingVertical: spacing.md,
-  paddingHorizontal: spacing.sm,
-  paddingLeft: spacing.md,
-});
-
-const $checkBadge: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+const $checkBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   position: 'absolute',
   top: -6,
   right: 4,
-  marginLeft: spacing.xs,
   backgroundColor: colors.surface,
   borderRadius: 8,
   padding: 2,
+});
+
+
+
+const $codeCardWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  // ... (Giữ nguyên)
+});
+
+// FIX: Bọc $codeInputWrapper bằng TouchableOpacity và đảm bảo nó focus input
+const $codeInputWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingVertical: spacing.sm,
+});
+
+const $codeBox: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  // ... (Giữ nguyên)
+  width: 40,
+  height: 50,
+  borderWidth: 1,
+  borderColor: colors.palette.neutral400,
+  borderRadius: spacing.sm,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginHorizontal: spacing.xxs,
+  backgroundColor: colors.surface,
+});
+
+// FIX: Style mới cho TextInput ẩn để đảm bảo nó không chặn tương tác
+const $hiddenInput: ThemedStyle<TextStyle> = () => ({
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  left: 0,
+  top: 0,
+  color: 'transparent', // Màu chữ trong suốt
+  backgroundColor: 'transparent',
 });
