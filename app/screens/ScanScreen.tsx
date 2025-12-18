@@ -18,7 +18,12 @@ import IconFlashOff from "@assets/svg/flash_off.svg";
 import IconGallery from "@assets/svg/gallery.svg";
 import IconLightBulb from "@assets/svg/lightbulb.svg";
 
-const { width } = Dimensions.get('window');
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+// ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
+const FRAME_WIDTH = screenWidth * 0.9;
+const FRAME_HEIGHT = FRAME_WIDTH / 2; // Tỉ lệ 1:2
+console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
 
 export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScreen(_props) {
   const { navigation } = _props;
@@ -32,6 +37,15 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
+  // Thêm useRef để lưu tọa độ thực tế của khung quét
+  const frameLayout = useRef({
+    x: (screenWidth - FRAME_WIDTH) / 2,
+    y: (screenHeight - FRAME_HEIGHT) / 2,
+    width: FRAME_WIDTH,
+    height: FRAME_HEIGHT
+  });
+
+  const containerRef = useRef<View>(null);
 
   useEffect(() => {
     if (!hasPermission) requestPermission();
@@ -40,7 +54,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     Animated.loop(
       Animated.sequence([
         Animated.timing(scanLineAnim, {
-          toValue: 250,
+          toValue: FRAME_HEIGHT - 2, // Trừ đi chiều cao của thanh quét
           duration: 3000,
           useNativeDriver: true,
         }),
@@ -61,7 +75,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       .replace(/S/g, '5')  // Nhầm S thành 5
       .replace(/B/g, '8'); // Nhầm B thành 8
 
-    console.log("Text sau khi dọn rác:", cleanText);
 
     // 2. Regex tìm dãy 6 số (Ưu tiên lấy dãy số cuối cùng vì vé số thường in số to ở dưới)
     const allNumbers = cleanText.match(/\d{6}/g);
@@ -74,53 +87,83 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     return {
       code: ticketCode,
       date: ticketDate,
-      raw: cleanText
     };
   };
 
-  const processImageForOCR = async (uri: string, photoWidth: number, photoHeight: number) => {
+  const processImageForOCR = async (uri: string, photoWidth: number, photoHeight: number, shouldCrop: boolean = true) => {
+    console.log({ photoWidth, photoHeight });
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      const screenWidth = Dimensions.get("window").width;
-      const screenHeight = Dimensions.get("window").height;
+      let finalUri = uri;
 
-      // 2. Tính toán vị trí khung đỏ dựa trên style $scanFrame của bạn
-      // Khung đỏ của bạn rộng 85% width, cao 250px
-      const frameWidth = screenWidth * 0.85;
-      const frameHeight = 250;
-      const frameX = (screenWidth - frameWidth) / 2;
-      const frameY = (screenHeight - 250) / 2; // Giả định khung nằm giữa theo chiều dọc
+      if (shouldCrop) {
+        // 1. Với VisionCamera, thường ảnh 4:3 sẽ 'Cover' màn hình theo chiều Cao hoặc Rộng
+        // Tính scale để ảnh lấp đầy (Cover) màn hình
+        const scale = Math.max(screenWidth / photoWidth, screenHeight / photoHeight);
 
-      // 3. Tính tỉ lệ scale giữa ảnh chụp và màn hình
-      const scaleX = photoWidth / screenWidth;
-      const scaleY = photoHeight / screenHeight;
+        // 2. Tính kích thước hiển thị thực tế của ảnh sau khi scale
+        const displayedPhotoWidth = photoWidth * scale;
+        const displayedPhotoHeight = photoHeight * scale;
 
-      // 4. Thực hiện cắt và tiền xử lý (Quan trọng để tăng chính xác OCR)
-      const manipulatedImage = await ImageManipulator.manipulateAsync(
-        uri,
-        [
-          {
-            crop: {
-              originX: frameX * scaleX,
-              originY: frameY * scaleY,
-              width: frameWidth * scaleX,
-              height: frameHeight * scaleY,
-            },
-          },
-          // Bí kíp: Chuyển về ảnh xám (grayscale) để ML Kit đọc số tốt hơn trên nền màu
-          { resize: { width: 1000 } }, // Giảm size xuống một chút để xử lý nhanh hơn
-        ],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
-      );
+        // 3. Tính phần dư bị tràn ra ngoài màn hình (Offsets)
+        // Lưu ý: Nếu ảnh lấp đầy chiều cao, offsetY sẽ là 0.
+        const offsetX = (displayedPhotoWidth - screenWidth) / 2;
+        const offsetY = (displayedPhotoHeight - screenHeight) / 2;
 
-      // Mở xem thử để check xem đã cắt đúng dãy số chưa
-      // await Sharing.shareAsync(manipulatedImage.uri);
-      await Sharing.shareAsync(manipulatedImage.uri);
-      const result = await TextRecognition.recognize(manipulatedImage.uri);
-      // 3. Hậu xử lý kết quả
+        // 4. LẤY TỌA ĐỘ TƯƠNG ĐỐI
+        // Quan trọng: fY bây giờ phải là tọa độ tính từ đỉnh của Camera View
+        const { x: fX, y: fY, width: fW, height: fH } = frameLayout.current;
+
+        // 5. Tính toán tọa độ cắt trên ảnh gốc
+        const actualOriginX = (fX + offsetX) / scale;
+        const actualOriginY = (fY + offsetY) / scale; // fY chuẩn sẽ sửa được lỗi lệch
+        const actualWidth = fW / scale;
+        const actualHeight = fH / scale;
+
+        console.log("DEBUG CROP:", { actualOriginY, scale, offsetY, fY });
+
+        if (actualWidth > 0 && actualHeight > 0) {
+          const manipulatedImage = await ImageManipulator.manipulateAsync(
+            uri,
+            [
+              {
+                crop: {
+                  originX: Math.max(0, actualOriginX),
+                  originY: Math.max(0, actualOriginY),
+                  width: Math.min(photoWidth - actualOriginX, actualWidth),
+                  height: Math.min(photoHeight - actualOriginY, actualHeight),
+                },
+              },
+              { resize: { width: 1200 } },
+            ],
+            { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          finalUri = manipulatedImage.uri;
+        }
+      } else {
+        // NẾU LÀ ẢNH TỪ GALLERY (ĐÃ CROP TAY)
+        // Chỉ cần resize nhẹ và grayscale để tăng độ chính xác OCR
+        const optimizedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1024 } }],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        finalUri = optimizedImage.uri;
+      }
+
+      // Debug: Xem ảnh thực tế mà AI sẽ đọc
+      // await Sharing.shareAsync(finalUri);
+
+      await Sharing.shareAsync(finalUri);
+      const result = await TextRecognition.recognize(finalUri,);
+      console.log("raw text:", result.text)
       const parsedData = cleanAndParseLotteryData(result.text);
-      console.log(parsedData)
+
+      if (parsedData.code) {
+        // Navigation tới màn kết quả hoặc điền code
+        console.log("Tìm thấy vé:", parsedData);
+      }
     } catch (error) {
       console.error("Lỗi OCR:", error);
     } finally {
@@ -133,7 +176,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       const photo = await camera.current.takePhoto({
         flash: isFlashOn ? 'on' : 'off',
       });
-      processImageForOCR(`file://${photo.path}`, photo.width, photo.height);
+      processImageForOCR(`file://${photo.path}`, photo.width, photo.height, true);
     }
   };
 
@@ -141,10 +184,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
+      // aspect: [2, 1], // Tỉ lệ 2:1
       quality: 1,
     });
     if (!result.canceled) {
-      processImageForOCR(result.assets[0].uri, result.assets[0].width, result.assets[0].height);
+      processImageForOCR(result.assets[0].uri, result.assets[0].width, result.assets[0].height, false);
     }
   };
 
@@ -157,7 +201,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   }
 
   return (
-    <View style={themed($container)}>
+    <View style={themed($container)} ref={containerRef}>
       <Camera
         ref={camera}
         style={StyleSheet.absoluteFill}
@@ -169,6 +213,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       <View style={themed($overlayContainer)}>
         <Header
           title="Quét Vé Số"
+          style={themed($headerStyle)}
           titleStyle={themed($headerTitle)}
           backgroundColor="transparent"
           LeftActionComponent={
@@ -187,7 +232,26 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         />
 
         <View style={themed($scanAreaWrapper)}>
-          <View style={themed($scanFrame)}>
+          <View
+            style={themed($scanFrame)}
+            onLayout={(event) => {
+              const { width, height } = event.nativeEvent.layout;
+              frameLayout.current.width = width;
+              frameLayout.current.height = height;
+
+              // ĐO TỌA ĐỘ SO VỚI CONTAINER (thay vì Window)
+              if (containerRef.current) {
+                event.target.measureLayout(
+                  containerRef.current,
+                  (x, y) => {
+                    frameLayout.current.x = x;
+                    frameLayout.current.y = y;
+                    console.log("Tọa độ khung thực tế:", { x, y });
+                  },
+                );
+              }
+            }}
+          >
             {/* 4 Góc khung quét */}
             <View style={themed([$corner, $topLeft])} />
             <View style={themed([$corner, $topRight])} />
@@ -239,6 +303,11 @@ const $overlayContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   justifyContent: 'space-between',
   paddingBottom: spacing.xl,
+  // backgroundColor: "'rgba(17, 16, 16, 0.3)',"
+})
+
+const $headerStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingHorizontal: spacing.md,
 })
 
 const $headerTitle: ThemedStyle<TextStyle> = ({ colors }) => ({
@@ -251,10 +320,12 @@ const $scanAreaWrapper: ThemedStyle<ViewStyle> = () => ({
   alignItems: 'center',
 })
 
-const $scanFrame: ThemedStyle<ViewStyle> = () => ({
-  width: width * 0.85,
-  height: 250,
+const $scanFrame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: FRAME_WIDTH,
+  height: FRAME_HEIGHT,
   position: 'relative',
+  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  borderRadius: spacing.md,
 })
 
 const $corner: ThemedStyle<ViewStyle> = ({ colors }) => ({

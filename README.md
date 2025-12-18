@@ -20,6 +20,7 @@ To make things work on your local simulator, or on your phone, you need first to
 npm run build:ios:sim # build for ios simulator
 npm run build:ios:device # build for ios device
 npm run build:ios:prod # build for ios device
+eas build --profile preview --platform android # build for cloud
 ```
 
 ### `./assets` directory
