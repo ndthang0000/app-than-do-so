@@ -32,7 +32,7 @@ import { ThemeProvider } from "./theme/context"
 import { customFontsToLoad } from "./theme/typography"
 import { loadDateFnsLocale } from "./utils/formatDate"
 import * as storage from "./utils/storage"
-
+import Toast from 'react-native-toast-message';
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
 // Web linking configuration
@@ -103,6 +103,7 @@ export function App() {
               initialState={initialNavigationState}
               onStateChange={onNavigationStateChange}
             />
+            <Toast />
           </ThemeProvider>
         </AuthProvider>
       </KeyboardProvider>

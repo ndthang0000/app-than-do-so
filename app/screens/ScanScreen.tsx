@@ -11,19 +11,46 @@ import { Text } from "@/components/Text"
 import { Header } from '@/components/Header';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
+import * as Haptics from "expo-haptics"
 // Icons
 import IconClose from "@assets/svg/close.svg";
 import IconFlashOn from "@assets/svg/flash_on.svg";
 import IconFlashOff from "@assets/svg/flash_off.svg";
 import IconGallery from "@assets/svg/gallery.svg";
 import IconLightBulb from "@assets/svg/lightbulb.svg";
-
+import Toast from 'react-native-toast-message';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
 const FRAME_WIDTH = screenWidth * 0.9;
 const FRAME_HEIGHT = FRAME_WIDTH / 2; // Tỉ lệ 1:2
 console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
+
+const toastConfig = {
+  info: ({ text1, text2 }: any) => {
+    const { theme: { colors } } = useAppTheme();
+    return (
+      <View style={{
+        height: 60,
+        width: '80%',
+        backgroundColor: colors.palette.neutral800,
+        borderRadius: 30,
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#FFD700', // Màu vàng primary của bạn
+        paddingHorizontal: 8
+      }}>
+        <Text style={{ color: colors.palette.accent300, fontWeight: 'bold', fontSize: 14 }} text={text1} />
+        {text2 &&
+          <Text style={{ color: colors.palette.accent200, fontSize: 12 }}>{text2}</Text>
+        }
+      </View>
+    )
+  }
+};
+
 
 export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScreen(_props) {
   const { navigation } = _props;
@@ -192,6 +219,23 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   };
 
+  const handleToggleFlash = () => {
+    setIsFlashOn(!isFlashOn);
+    Toast.show({
+      type: 'info',
+      text1: `Đèn Flash đang ${!isFlashOn ? 'BẬT' : 'TẮT'}`,
+      position: 'bottom',
+      bottomOffset: 150,
+      visibilityTime: 700,
+    });
+    if (!isFlashOn) {
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft)
+    }
+  }
+
   if (!hasPermission || !device) {
     return (
       <Screen style={themed($container)} safeAreaEdges={['top']}>
@@ -222,11 +266,13 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             </TouchableOpacity>
           }
           RightActionComponent={
-            <TouchableOpacity onPress={() => setIsFlashOn(!isFlashOn)}>
-              {isFlashOn ?
-                <IconFlashOn color={colors.palette.primary400} width={28} height={28} /> :
-                <IconFlashOff color={colors.palette.neutral100} width={28} height={28} />
-              }
+            <TouchableOpacity onPress={handleToggleFlash}>
+              <View style={themed($iconCircle)}>
+                {isFlashOn ?
+                  <IconFlashOn color={colors.palette.accent400} width={28} height={28} /> :
+                  <IconFlashOff color={colors.palette.neutral300} width={28} height={28} />
+                }
+              </View>
             </TouchableOpacity>
           }
         />
@@ -281,12 +327,13 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
           <TouchableOpacity style={themed($footerBtn)}>
             <View style={themed($iconCircle)}>
-              <IconLightBulb color={colors.palette.primary400} width={24} height={24} />
+              <IconLightBulb color={colors.palette.accent400} width={24} height={24} />
             </View>
             <Text text='MẸO' size='xxs' weight='bold' style={{ color: colors.palette.neutral100 }} />
           </TouchableOpacity>
         </View>
       </View>
+      <Toast config={toastConfig} />
     </View>
   );
 };
