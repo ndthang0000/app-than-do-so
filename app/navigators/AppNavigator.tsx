@@ -19,6 +19,8 @@ import { MainNavigator } from "./MainNavigator"
 import { ManualInputScreen } from "@/screens/ManualInputScreen"
 import { LotteryScheduleScreen } from "@/screens/LotteryScheduleScreen"
 import { NotificationScreen } from "@/screens/NotificationScreen"
+import Toast from "react-native-toast-message"
+import { getToastConfig } from "@/components/toastConfig"
 
 /**
  * This is a list of all the route names that will exit the app if the back button
@@ -67,7 +69,7 @@ const AppStack = () => {
 }
 
 export const AppNavigator = (props: NavigationProps) => {
-  const { navigationTheme } = useAppTheme()
+  const { navigationTheme, theme } = useAppTheme()
 
   useBackButtonHandler((routeName) => exitRoutes.includes(routeName))
 
@@ -75,6 +77,7 @@ export const AppNavigator = (props: NavigationProps) => {
     <NavigationContainer ref={navigationRef} theme={navigationTheme} {...props}>
       <ErrorBoundary catchErrors={Config.catchErrors}>
         <AppStack />
+        <Toast config={getToastConfig(theme)} />
       </ErrorBoundary>
     </NavigationContainer>
   )

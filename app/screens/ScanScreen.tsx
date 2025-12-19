@@ -223,7 +223,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     setIsFlashOn(!isFlashOn);
     Toast.show({
       type: 'info',
-      text1: `Đèn Flash đang ${!isFlashOn ? 'BẬT' : 'TẮT'}`,
+      text1: `${!isFlashOn ? '💡' : ''}Đèn Flash đang ${!isFlashOn ? 'BẬT' : 'TẮT'}`,
       position: 'bottom',
       bottomOffset: 150,
       visibilityTime: 700,
