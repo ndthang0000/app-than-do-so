@@ -7,8 +7,8 @@ import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import { useState } from "react"
 import { DisplayModeToggle } from "./DisplayModeToggle"
 import { LotoTable } from "./LotoTable"
+import { Region } from "@/constants/lotteryTicket"
 
-export type Region = "north" | "central" | "south"
 export type DisplayMode = "full" | "last2" | "last3"
 
 type Props = {

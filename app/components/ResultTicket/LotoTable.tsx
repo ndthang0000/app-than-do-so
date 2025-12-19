@@ -5,7 +5,7 @@ import LinearGradient from "react-native-linear-gradient"
 import { ThemedStyle } from "@/theme/types";
 import { useAppTheme } from "@/theme/context";
 import { ProvinceResult } from "./HeaderRow";
-import { Region } from "./LotteryResultTable";
+import { Region } from "@/constants/lotteryTicket";
 
 type LotoTableProp = {
   provinces: ProvinceResult[],

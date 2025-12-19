@@ -9,56 +9,17 @@ import { Text } from "@/components/Text"
 import { Header } from '@/components/Header';
 import IconBack from "@assets/svg/arrow-left.svg";
 import IconDrawLottery from "@assets/svg/draw-lotery.svg"; // Icon lịch trên header
-
-// --- DỮ LIỆU LỊCH QUAY SỐ ---
-const SCHEDULE_DATA = [
-  {
-    regionName: 'Xổ Số Miền Nam',
-    time: '16:15',
-    schedule: [
-      { day: 'T2', provinces: ['TP.HCM', 'Đồng Tháp', 'Cà Mau'] },
-      { day: 'T3', provinces: ['Bến Tre', 'Vũng Tàu', 'Bạc Liêu'] },
-      { day: 'T4', provinces: ['Đồng Nai', 'Cần Thơ', 'Sóc Trăng'] },
-      { day: 'T5', provinces: ['Tây Ninh', 'An Giang', 'Bình Thuận'] },
-      { day: 'T6', provinces: ['Vĩnh Long', 'Bình Dương', 'Trà Vinh'] },
-      { day: 'T7', provinces: ['TP.HCM', 'Bình Phước', 'Hậu Giang'] },
-      { day: 'CN', provinces: ['Tiền Giang', 'Kiên Giang', 'Đà Lạt'] },
-    ]
-  },
-  {
-    regionName: 'Xổ Số Miền Trung',
-    time: '17:15',
-    schedule: [
-      { day: 'T2', provinces: ['TT.Huế', 'Phú Yên'] },
-      { day: 'T3', provinces: ['Đắk Lắk', 'Quảng Nam'] },
-      { day: 'T4', provinces: ['Đà Nẵng', 'Khánh Hòa'] },
-      { day: 'T5', provinces: ['Bình Định', 'Quảng Trị', 'Quảng Bình'] },
-      { day: 'T6', provinces: ['Gia Lai', 'Ninh Thuận'] },
-      { day: 'T7', provinces: ['Đà Nẵng', 'Quảng Ngãi', 'Đắk Nông'] },
-      { day: 'CN', provinces: ['Khánh Hòa', 'Kon Tum', 'TT-Huế'] },
-    ]
-  },
-  {
-    regionName: 'Xổ Số Miền Bắc',
-    time: '18:15',
-    schedule: [
-      { day: 'T2', provinces: ['Hà Nội'] },
-      { day: 'T3', provinces: ['Quảng Ninh'] },
-      { day: 'T4', provinces: ['Bắc Ninh'] },
-      { day: 'T5', provinces: ['Hà Nội'] },
-      { day: 'T6', provinces: ['Hải Phòng'] },
-      { day: 'T7', provinces: ['Nam Định'] },
-      { day: 'CN', provinces: ['Thái Bình'] },
-    ]
-  }
-];
+import { LOTTERY_SCHEDULE } from '@/constants/lotterySchedule';
+import { WEEKDAY_LABEL_MAP } from '@/constants/lotteryTicket';
+import { format } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 
 export const LotteryScheduleScreen: React.FC<AppStackScreenProps<'Schedule'>> = function LotteryScheduleScreen(_props) {
   const { themed, theme: { colors, spacing } } = useAppTheme();
   const { navigation } = _props;
+  const fullDayName = format(new Date(), 'EEEE', { locale: enUS }).toLowerCase();
 
   // Giả định hôm nay là Thứ 4 để giống design (hoặc dùng new Date().getDay() thực tế)
-  const currentDay = 'T4';
 
   const BackIcon = () => (
     <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5}>
@@ -74,8 +35,8 @@ export const LotteryScheduleScreen: React.FC<AppStackScreenProps<'Schedule'>> = 
   );
 
   const renderScheduleRow = (item: any, index: number) => {
-    const isToday = item.day === currentDay;
-    const isWeekend = item.day === 'T7' || item.day === 'CN';
+    const isToday = item.date === fullDayName;
+    const isWeekend = item.date === 'sunday' || item.date === 'saturday';
 
     // Style cho hàng (Row)
     const rowStyle = themed([
@@ -92,7 +53,7 @@ export const LotteryScheduleScreen: React.FC<AppStackScreenProps<'Schedule'>> = 
         {/* Cột Thứ */}
         <View style={themed($dayColumn)}>
           <Text
-            text={item.day}
+            text={WEEKDAY_LABEL_MAP[item.date as keyof typeof WEEKDAY_LABEL_MAP]}
             weight={isToday || isWeekend ? 'bold' : 'medium'}
             size="md"
             style={{ color: dayTextColor }}
@@ -125,7 +86,7 @@ export const LotteryScheduleScreen: React.FC<AppStackScreenProps<'Schedule'>> = 
 
       <Screen preset="scroll" contentContainerStyle={themed($screenContentContainer)}>
 
-        {SCHEDULE_DATA.map((regionData, index) => (
+        {LOTTERY_SCHEDULE.map((regionData, index) => (
           <View key={index} style={{ marginBottom: spacing.lg }}>
             {/* Header Tên Miền + Giờ */}
             <View style={themed($regionHeader)}>

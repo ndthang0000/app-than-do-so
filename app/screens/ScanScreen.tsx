@@ -12,6 +12,7 @@ import { Header } from '@/components/Header';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from "expo-haptics"
+import { useIsFocused } from '@react-navigation/native';
 // Icons
 import IconClose from "@assets/svg/close.svg";
 import IconFlashOn from "@assets/svg/flash_on.svg";
@@ -19,11 +20,14 @@ import IconFlashOff from "@assets/svg/flash_off.svg";
 import IconGallery from "@assets/svg/gallery.svg";
 import IconLightBulb from "@assets/svg/lightbulb.svg";
 import Toast from 'react-native-toast-message';
+import { cleanAndParseLotteryData } from '@/utils/cleanLotteryData';
+import { OpenCV } from 'react-native-fast-opencv';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
 const FRAME_WIDTH = screenWidth * 0.9;
 const FRAME_HEIGHT = FRAME_WIDTH / 2; // Tỉ lệ 1:2
+const isFocused = useIsFocused();
 console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
 
 const toastConfig = {
@@ -94,28 +98,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     ).start();
   }, [hasPermission]);
 
-  const cleanAndParseLotteryData = (rawText: string) => {
-    // 1. Chuẩn hóa văn bản: Viết hoa, xóa khoảng trắng thừa, thay đổi các ký tự dễ nhầm
-    let cleanText = rawText.toUpperCase()
-      .replace(/O/g, '0')  // Nhầm chữ O thành số 0
-      .replace(/[IL|]/g, '1') // Nhầm chữ I, L, gạch đứng thành số 1
-      .replace(/S/g, '5')  // Nhầm S thành 5
-      .replace(/B/g, '8'); // Nhầm B thành 8
 
-
-    // 2. Regex tìm dãy 6 số (Ưu tiên lấy dãy số cuối cùng vì vé số thường in số to ở dưới)
-    const allNumbers = cleanText.match(/\d{6}/g);
-    const ticketCode = allNumbers ? allNumbers[allNumbers.length - 1] : null;
-
-    // 3. Regex tìm ngày tháng (dd-mm-yyyy)
-    const dateMatch = cleanText.match(/\d{2}-\d{2}-\d{4}/);
-    const ticketDate = dateMatch ? dateMatch[0] : null;
-
-    return {
-      code: ticketCode,
-      date: ticketDate,
-    };
-  };
 
   const processImageForOCR = async (uri: string, photoWidth: number, photoHeight: number, shouldCrop: boolean = true) => {
     console.log({ photoWidth, photoHeight });
@@ -179,18 +162,15 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         finalUri = optimizedImage.uri;
       }
 
-      // Debug: Xem ảnh thực tế mà AI sẽ đọc
-      // await Sharing.shareAsync(finalUri);
+
+
 
       await Sharing.shareAsync(finalUri);
       const result = await TextRecognition.recognize(finalUri,);
       console.log("raw text:", result.text)
       const parsedData = cleanAndParseLotteryData(result.text);
+      console.log("parsedData", parsedData);
 
-      if (parsedData.code) {
-        // Navigation tới màn kết quả hoặc điền code
-        console.log("Tìm thấy vé:", parsedData);
-      }
     } catch (error) {
       console.error("Lỗi OCR:", error);
     } finally {
@@ -250,7 +230,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         ref={camera}
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={true}
+        isActive={isFocused}
         photo={true}
       />
 
