@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ViewStyle, TextStyle, TouchableOpacity, Dimensions, Animated, StyleSheet } from 'react-native';
-import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+import { View, ViewStyle, TextStyle, TouchableOpacity, Dimensions, Animated, StyleSheet, AppState, AppStateStatus } from 'react-native';
+import { Camera, useCameraDevice, useCameraPermission, useFrameProcessor } from 'react-native-vision-camera';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppTheme } from '@/theme/context';
@@ -12,7 +12,7 @@ import { Header } from '@/components/Header';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from "expo-haptics"
-import { useIsFocused } from '@react-navigation/native';
+import { useRunOnJS } from 'react-native-worklets-core';
 // Icons
 import IconClose from "@assets/svg/close.svg";
 import IconFlashOn from "@assets/svg/flash_on.svg";
@@ -21,13 +21,22 @@ import IconGallery from "@assets/svg/gallery.svg";
 import IconLightBulb from "@assets/svg/lightbulb.svg";
 import Toast from 'react-native-toast-message';
 import { cleanAndParseLotteryData } from '@/utils/cleanLotteryData';
-import { OpenCV } from 'react-native-fast-opencv';
+import { useTextRecognition } from 'react-native-vision-camera-ocr-plus';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
 const FRAME_WIDTH = screenWidth * 0.9;
 const FRAME_HEIGHT = FRAME_WIDTH / 2; // Tỉ lệ 1:2
-const isFocused = useIsFocused();
+
+const topDistance = (screenHeight - FRAME_HEIGHT) / 2;
+const leftDistance = 5 / 100 * screenWidth;
+
+const topPercent = (topDistance / screenHeight) * 100;
+// Tọa độ X bắt đầu (cách lề 5% vì FRAME_WIDTH = 90%)
+const leftPercent = 5;
+const widthPercent = 90;
+const heightPercent = (FRAME_HEIGHT / screenHeight) * 100;
+
 console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
 
 const toastConfig = {
@@ -57,6 +66,7 @@ const toastConfig = {
 
 
 export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScreen(_props) {
+
   const { navigation } = _props;
   const { themed, theme: { colors, spacing } } = useAppTheme();
 
@@ -65,8 +75,37 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const { hasPermission, requestPermission } = useCameraPermission();
   const camera = useRef<Camera>(null);
 
+  const [shouldRenderCamera, setShouldRenderCamera] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isScanningActive, setIsScanningActive] = useState(false);
+  const [hasFoundResult, setHasFoundResult] = useState(false);
+
+  // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
+  // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
+
+
+  const { scanText } = useTextRecognition({
+    language: 'latin',
+    frameSkipThreshold: 5,
+    useLightweightMode: true,
+    scanRegion: {
+      left: `${leftPercent}%`,
+      top: `${topPercent}%`,
+      width: `${widthPercent}%`,
+      height: `${heightPercent}%`
+    }
+  });
+
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+    if (!isScanningActive || hasFoundResult) return;
+    const data = scanText(frame);
+    if (data && data.resultText) {
+      handleOCR(data.resultText);
+    }
+  }, [isScanningActive]);
+
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   // Thêm useRef để lưu tọa độ thực tế của khung quét
   const frameLayout = useRef({
@@ -78,27 +117,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
   const containerRef = useRef<View>(null);
 
-  useEffect(() => {
-    if (!hasPermission) requestPermission();
-
-    // Animation thanh quét
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scanLineAnim, {
-          toValue: FRAME_HEIGHT - 2, // Trừ đi chiều cao của thanh quét
-          duration: 3000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scanLineAnim, {
-          toValue: 0,
-          duration: 3000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [hasPermission]);
-
-
+  const handleOCR = useRunOnJS((result) => {
+    // Xử lý 7 Pipeline của bạn ở đây
+    if (!isScanningActive || hasFoundResult) return;
+    console.log(result)
+  }, [isScanningActive]);
 
   const processImageForOCR = async (uri: string, photoWidth: number, photoHeight: number, shouldCrop: boolean = true) => {
     console.log({ photoWidth, photoHeight });
@@ -178,15 +201,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   };
 
-  const takePhoto = async () => {
-    if (camera.current && !isProcessing) {
-      const photo = await camera.current.takePhoto({
-        flash: isFlashOn ? 'on' : 'off',
-      });
-      processImageForOCR(`file://${photo.path}`, photo.width, photo.height, true);
-    }
-  };
-
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -216,6 +230,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   }
 
+  const toggleScanning = () => {
+    setIsScanningActive(!isScanningActive);
+    setHasFoundResult(false);
+  };
+
   if (!hasPermission || !device) {
     return (
       <Screen style={themed($container)} safeAreaEdges={['top']}>
@@ -224,14 +243,59 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     );
   }
 
+  useEffect(() => {
+    if (!hasPermission) requestPermission();
+
+    // Animation thanh quét
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLineAnim, {
+          toValue: FRAME_HEIGHT - 4, // Trừ đi chiều cao của thanh quét
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanLineAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [hasPermission]);
+
+  useEffect(() => {
+    // 1. Khi màn hình thực sự hiện ra trước mắt người dùng
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      console.log("Màn hình Scan ĐÃ VÀO - Bật camera");
+      setIsScanningActive(false); // Reset state luôn tại đây
+      setShouldRenderCamera(true);
+    });
+
+    // 2. Khi màn hình bị che đi hoặc người dùng thoát ra
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      console.log("Màn hình Scan ĐÃ THOÁT - Hủy hoàn toàn camera");
+      setIsFlashOn(false);
+      setIsScanningActive(false);
+      setShouldRenderCamera(false);
+    });
+
+    // Cleanup khi component bị hủy hẳn
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation]);
+
   return (
     <View style={themed($container)} ref={containerRef}>
       <Camera
         ref={camera}
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={isFocused}
-        photo={true}
+        isActive={shouldRenderCamera}
+        frameProcessor={frameProcessor}
+        pixelFormat={'yuv'}
+        torch={isFlashOn ? 'on' : 'off'}
       />
 
       <View style={themed($overlayContainer)}>
@@ -283,9 +347,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             <View style={themed([$corner, $topRight])} />
             <View style={themed([$corner, $bottomLeft])} />
             <View style={themed([$corner, $bottomRight])} />
-
             <Animated.View
-              style={[themed($scanLine), { transform: [{ translateY: scanLineAnim }] }]}
+              style={[themed([$scanLine, { opacity: isScanningActive ? 1 : 0 }]), { transform: [{ translateY: scanLineAnim }] }]}
             />
           </View>
           <View style={themed($hintTextWrapper)}>
@@ -300,10 +363,12 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             </View>
             <Text text='THƯ VIỆN' size='xxs' weight='bold' style={{ color: colors.palette.neutral100 }} />
           </TouchableOpacity>
-
-          <TouchableOpacity style={themed($shutterBtn)} onPress={takePhoto}>
-            <View style={themed($shutterInner)} />
-          </TouchableOpacity>
+          <View style={{ alignItems: 'center', gap: spacing.xxs }}>
+            <TouchableOpacity style={themed($shutterBtn)} onPress={toggleScanning}>
+              <View style={themed(isScanningActive ? $shutterInnerScanning : $shutterInner)} />
+            </TouchableOpacity>
+            <Text text={isScanningActive ? 'Đang quét...' : 'Nhấn để bắt đầu quét'} size='xs' weight='bold' style={{ color: isScanningActive ? colors.tint : colors.palette.neutral100, textAlign: 'center' }} />
+          </View>
 
           <TouchableOpacity style={themed($footerBtn)}>
             <View style={themed($iconCircle)}>
@@ -345,6 +410,9 @@ const $headerTitle: ThemedStyle<TextStyle> = ({ colors }) => ({
 
 const $scanAreaWrapper: ThemedStyle<ViewStyle> = () => ({
   alignItems: 'center',
+  position: 'absolute',
+  top: topDistance,
+  left: leftDistance,
 })
 
 const $scanFrame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -377,10 +445,11 @@ const $bottomRight: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $scanLine: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: '100%',
+  width: '98%',
   height: 2,
+  marginHorizontal: '1%',
   backgroundColor: colors.palette.primary400,
-  shadowColor: colors.palette.primary400,
+  shadowColor: colors.palette.primary500,
   shadowOpacity: 0.8,
   shadowRadius: 10,
   elevation: 10,
@@ -396,7 +465,7 @@ const $hintTextWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
-  justifyContent: 'space-around',
+  justifyContent: 'space-between',
   alignItems: 'center',
   paddingHorizontal: spacing.lg,
 })
@@ -429,5 +498,12 @@ const $shutterInner: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: 64,
   height: 64,
   borderRadius: 32,
+  backgroundColor: colors.palette.primary500,
+})
+
+const $shutterInnerScanning: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 36,
+  height: 36,
+  borderRadius: 8,
   backgroundColor: colors.palette.primary500,
 })
