@@ -17,3 +17,10 @@ export const WEEKDAY_LABEL_MAP: Record<Weekday, string> = {
   friday: "T6",
   saturday: "T7",
 }
+
+export interface ScanResult {
+  code?: string;
+  date?: string;
+  region?: Region;
+  station?: string;
+}

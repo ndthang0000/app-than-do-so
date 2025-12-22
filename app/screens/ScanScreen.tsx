@@ -22,6 +22,9 @@ import IconLightBulb from "@assets/svg/lightbulb.svg";
 import Toast from 'react-native-toast-message';
 import { cleanAndParseLotteryData } from '@/utils/cleanLotteryData';
 import { useTextRecognition } from 'react-native-vision-camera-ocr-plus';
+import { ScanInfoOverlay } from '@/components/Scan/ScanInfoOverlay';
+import { ScanResult } from '@/constants/lotteryTicket';
+import { fastParseFrame, getMostFrequent } from '@/utils/fastParseFrame';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
@@ -37,6 +40,12 @@ const leftPercent = 5;
 const widthPercent = 90;
 const heightPercent = (FRAME_HEIGHT / screenHeight) * 100;
 
+const CONFIDENCE_THRESHOLD = 5;
+const defaultStats = {
+  codes: {} as Record<string, number>,
+  stations: {} as Record<string, number>,
+  dates: {} as Record<string, number>,
+}
 console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
 
 const toastConfig = {
@@ -64,7 +73,6 @@ const toastConfig = {
   }
 };
 
-
 export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScreen(_props) {
 
   const { navigation } = _props;
@@ -80,10 +88,66 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScanningActive, setIsScanningActive] = useState(false);
   const [hasFoundResult, setHasFoundResult] = useState(false);
-
+  const [scanResult, setScanResult] = useState<ScanResult>({});
+  const [appState, setAppState] = useState(AppState.currentState);
+  const statsRef = useRef(defaultStats);
   // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
 
+  const handleOCR = useRunOnJS((frameData) => {
+    // Xử lý 7 Pipeline của bạn ở đây
+    if (!isScanningActive || hasFoundResult) return;
+
+    const current = fastParseFrame(frameData.split('\n'));
+    if (!current) return;
+
+    // LOGIC NÂNG CAO: Chống nhầm lẫn mmyyyy
+    if (current.code && current.date) {
+      const dateNumbers = current.date.replace(/[^0-9]/g, ''); // Ví dụ: 12052024
+
+      // Nếu mã vé giống hệt 6 số cuối của ngày (052024) hoặc 6 số đầu (120520)
+      // thì khả năng cao là detect nhầm ngày tháng
+      if (dateNumbers.includes(current.code)) {
+        return;
+      }
+    }
+
+    // 1. Cập nhật kho dữ liệu (Thêm vào chứ không đè)
+    const keys: (keyof ScanResult)[] = ['code', 'station', 'date'];
+
+    keys.forEach(key => {
+      const val = current[key];
+      if (!val) return;
+
+      // Tăng đếm tần suất
+      const statsKey = key === 'code' ? 'codes' : key === 'station' ? 'stations' : 'dates';
+      statsRef.current[statsKey][val] = (statsRef.current[statsKey][val] || 0) + 1;
+
+      // 2. TÌM GIÁ TRỊ TỐT NHẤT TRONG KHO
+      const bestMatch = getMostFrequent(statsRef.current[statsKey]);
+
+      // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
+      // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
+      if (bestMatch.freq >= CONFIDENCE_THRESHOLD) {
+        setScanResult(prev => {
+          // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
+          if (prev[key] !== bestMatch.value) {
+            return { ...prev, [key]: bestMatch.value };
+          }
+          return prev;
+        });
+      }
+    });
+
+
+
+    if (scanResult.code && scanResult.station && scanResult.date) {
+      setIsScanningActive(false);
+      setHasFoundResult(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+      // Bạn có thể navigate hoặc hiện Modal kết quả tại đây
+    }
+  }, [isScanningActive]);
 
   const { scanText } = useTextRecognition({
     language: 'latin',
@@ -117,14 +181,9 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
   const containerRef = useRef<View>(null);
 
-  const handleOCR = useRunOnJS((result) => {
-    // Xử lý 7 Pipeline của bạn ở đây
-    if (!isScanningActive || hasFoundResult) return;
-    console.log(result)
-  }, [isScanningActive]);
+
 
   const processImageForOCR = async (uri: string, photoWidth: number, photoHeight: number, shouldCrop: boolean = true) => {
-    console.log({ photoWidth, photoHeight });
     if (isProcessing) return;
     setIsProcessing(true);
     try {
@@ -265,24 +324,32 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
   useEffect(() => {
     // 1. Khi màn hình thực sự hiện ra trước mắt người dùng
+
     const unsubscribeFocus = navigation.addListener('focus', () => {
-      console.log("Màn hình Scan ĐÃ VÀO - Bật camera");
       setIsScanningActive(false); // Reset state luôn tại đây
+      statsRef.current = defaultStats;
+      setScanResult({});
       setShouldRenderCamera(true);
     });
 
     // 2. Khi màn hình bị che đi hoặc người dùng thoát ra
     const unsubscribeBlur = navigation.addListener('blur', () => {
-      console.log("Màn hình Scan ĐÃ THOÁT - Hủy hoàn toàn camera");
       setIsFlashOn(false);
       setIsScanningActive(false);
       setShouldRenderCamera(false);
+      statsRef.current = defaultStats;
+      setScanResult({});
+    });
+
+    const unSubscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      setAppState(nextAppState);
     });
 
     // Cleanup khi component bị hủy hẳn
     return () => {
       unsubscribeFocus();
       unsubscribeBlur();
+      unSubscription.remove();
     };
   }, [navigation]);
 
@@ -292,7 +359,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         ref={camera}
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={shouldRenderCamera}
+        isActive={shouldRenderCamera && appState === 'active'}
         frameProcessor={frameProcessor}
         pixelFormat={'yuv'}
         torch={isFlashOn ? 'on' : 'off'}
@@ -305,7 +372,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
           titleStyle={themed($headerTitle)}
           backgroundColor="transparent"
           LeftActionComponent={
-            <TouchableOpacity onPress={() => navigation.goBack()}>
+            <TouchableOpacity onPress={() => navigation.goBack()} disabled={isScanningActive} style={{ opacity: isScanningActive ? 0.4 : 1 }}>
               <IconClose color={colors.palette.neutral100} width={28} height={28} />
             </TouchableOpacity>
           }
@@ -320,7 +387,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             </TouchableOpacity>
           }
         />
-
+        <ScanInfoOverlay isVisible={isScanningActive} data={scanResult} />
         <View style={themed($scanAreaWrapper)}>
           <View
             style={themed($scanFrame)}
@@ -357,7 +424,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         </View>
 
         <View style={themed($footer)}>
-          <TouchableOpacity style={themed($footerBtn)} onPress={pickImage}>
+          <TouchableOpacity style={themed([$footerBtn, { opacity: isScanningActive ? 0.4 : 1 }])} onPress={pickImage} disabled={isScanningActive}>
             <View style={themed($iconCircle)}>
               <IconGallery color={colors.palette.neutral100} width={24} height={24} />
             </View>

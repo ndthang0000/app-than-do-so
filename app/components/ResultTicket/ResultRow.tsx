@@ -4,7 +4,8 @@ import { PrizeKey, ProvinceResult } from "./HeaderRow";
 import { Text } from "../Text";
 import { ThemedStyle } from "@/theme/types";
 import LinearGradient from "react-native-linear-gradient"
-import { DisplayMode, Region } from "./LotteryResultTable";
+import { DisplayMode } from "./LotteryResultTable";
+import { Region } from "@/constants/lotteryTicket";
 
 function PrizeNumbers({
   numbers,
