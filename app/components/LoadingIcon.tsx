@@ -23,8 +23,8 @@ export default function LoadingIcon() {
 
   return (
     <AnimatedSvg
-      height="24"
-      width="24"
+      height="22"
+      width="22"
       viewBox="0 -960 960 960"
       fill={'#2563EB'}
       style={animatedStyle} // Áp dụng chuyển động xoay

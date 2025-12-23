@@ -1,14 +1,14 @@
 // Create LotteryScheduleScreen.tsx
 import React from 'react';
-import { View, ViewStyle, TouchableOpacity, ScrollView, TextStyle } from 'react-native';
+import { View, ViewStyle, TouchableOpacity } from 'react-native';
 import { useAppTheme } from '@/theme/context';
 import type { ThemedStyle } from '@/theme/types';
-import { AppStackScreenProps, HomeTabScreenProps } from '@/navigators/navigationTypes';
+import { AppStackScreenProps } from '@/navigators/navigationTypes';
 import { Screen } from '@/components/Screen';
 import { Text } from "@/components/Text"
 import { Header } from '@/components/Header';
 import IconBack from "@assets/svg/arrow-left.svg";
-import IconDrawLottery from "@assets/svg/draw-lotery.svg"; // Icon lịch trên header
+import IconDrawLottery from "@assets/svg/draw-lottery.svg"; // Icon lịch trên header
 import { LOTTERY_SCHEDULE } from '@/constants/lotterySchedule';
 import { WEEKDAY_LABEL_MAP } from '@/constants/lotteryTicket';
 import { format } from 'date-fns';
@@ -175,7 +175,7 @@ const $provinceChip: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   borderWidth: 1,
   borderColor: colors.palette.neutral300,
   borderRadius: spacing.xs,
-  paddingHorizontal: spacing.sm,
+  paddingHorizontal: spacing.xs,
   paddingVertical: spacing.xxs,
   backgroundColor: colors.surface,
 });

@@ -62,11 +62,11 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
         titleStyle={{ color: colors.text, fontWeight: "semibold", fontSize: 20 }}
       />
       <Screen preset="scroll" contentContainerStyle={$styles.container}>
-        <View style={themed($scanWrapper)}>
+        <TouchableOpacity style={themed($scanWrapper)} activeOpacity={0.7} onPress={() => navigation.navigate('Scan')}>
           <IconScan width={80} height={80} />
           <Text text='Scan ảnh vé số' weight='bold' size="lg" />
           <Text text='Bạn sẽ nhận thông báo ngay khi có kết quả' preset='default' weight='light' style={{ textAlign: 'center' }} />
-        </View>
+        </TouchableOpacity>
         <View style={themed($subMenuWrapper)}>
           {dataSubMenu.map(({ icon: Icon, label, navigate }) => (
             <TouchableOpacity key={label} style={themed($subMenuItemWrapper)} activeOpacity={0.7} onPress={() => navigation.navigate(navigate as any, {})}>
@@ -86,7 +86,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
 
         {/* 3 Miền Bắc Trung Nam */}
         <View style={{ flexDirection: 'column', gap: spacing.md, marginBottom: spacing.md }}>
-          <TouchableOpacity style={themed($resultItemWrapper)} onPress={() => navigation.navigate("Result", { itemIndex: "0", queryIndex: "Sdfds" })}>
+          <TouchableOpacity style={themed($resultItemWrapper)} onPress={() => navigation.navigate("Result", {})}>
             <View style={themed([$nameRegionWrapper, { backgroundColor: "#ededb6ff" }])}>
               <Text text='Bắc' style={themed([$textRegion, { color: "#e1ab07ff" }])} />
             </View>
@@ -104,7 +104,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
               <IconArrowRight width={16} height={16} />
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={themed($resultItemWrapper)}>
+          <TouchableOpacity style={themed($resultItemWrapper)} onPress={() => navigation.navigate("Result", {})}>
             <View style={themed([$nameRegionWrapper, { backgroundColor: "#DBEAFE" }])}>
               <Text text='Trung' style={themed([$textRegion, { color: "#2563EB" }])} />
             </View>
@@ -122,7 +122,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
               <IconArrowRight width={16} height={16} />
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={themed($resultItemWrapper)}>
+          <TouchableOpacity style={themed($resultItemWrapper)} onPress={() => navigation.navigate("Result", {})}>
             <View style={themed([$nameRegionWrapper, { backgroundColor: "#DCFCE7" }])}>
               <Text text='Nam' style={themed([$textRegion, { color: "#16A34A" }])} />
             </View>

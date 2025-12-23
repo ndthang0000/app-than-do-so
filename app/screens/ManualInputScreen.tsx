@@ -447,8 +447,8 @@ const $datePickerHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginBottom: spacing.md,
-  paddingHorizontal: spacing.sm + 4,
+  marginBottom: spacing.sm,
+  paddingHorizontal: spacing.sm + 2,
 });
 
 

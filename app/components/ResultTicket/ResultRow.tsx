@@ -121,7 +121,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode }
                   isTwoRow={needGridLayout.includes(prize)}
                   textStyle={{
                     color: isHighlighted ? colors.primary : colors.text,
-                    fontWeight: "700",
+                    fontWeight: "800",
                     fontSize: 16,
                   }}
                 />
@@ -132,7 +132,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode }
                       text={num}
                       style={{
                         color: isHighlighted ? colors.primary : colors.text,
-                        fontWeight: "700",
+                        fontWeight: "800",
                         fontSize: 16,
                       }}
                     />

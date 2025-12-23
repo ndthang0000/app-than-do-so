@@ -5,9 +5,9 @@ import { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import { useState } from "react"
-import { DisplayModeToggle } from "./DisplayModeToggle"
 import { LotoTable } from "./LotoTable"
 import { Region } from "@/constants/lotteryTicket"
+import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
 
 export type DisplayMode = "full" | "last2" | "last3"
 
@@ -81,7 +81,7 @@ export function LotteryResultTable({ provinces, region }: Props) {
           ))
         }
       </View>
-      <DisplayModeToggle value={displayMode} onChange={handleChangeDisplayMode} />
+      <DisplayModeToggleV2 value={displayMode} onChange={handleChangeDisplayMode} />
       <LotoTable provinces={provinces} region={region} />
     </View>
   )

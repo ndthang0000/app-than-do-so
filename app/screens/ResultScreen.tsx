@@ -40,10 +40,10 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
     if (date.toDateString() === today.toDateString()) {
-      secondaryTitle = 'HÔM NAY';
+      secondaryTitle = 'Hôm nay';
     }
     else if (date.toDateString() === yesterday.toDateString()) {
-      secondaryTitle = 'HÔM QUA';
+      secondaryTitle = 'Hôm qua';
     }
 
     return {
@@ -51,6 +51,18 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
       formattedDate
     };
   };
+
+  const handlePrevious = () => {
+    const date = new Date(currentSelectedDate);
+    date.setDate(date.getDate() - 1);
+    setCurrentSelectedDate(date.toISOString().split("T")[0]);
+  }
+
+  const handleNext = () => {
+    const date = new Date(currentSelectedDate);
+    date.setDate(date.getDate() + 1);
+    setCurrentSelectedDate(date.toISOString().split("T")[0]);
+  }
 
   const SettingPressableIcon = () => {
     return (
@@ -71,7 +83,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
         titleStyle={{ color: colors.text, fontWeight: "bold", fontSize: 20 }}
       />
       <View style={themed($dateWrapper)}>
-        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5}>
+        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handlePrevious}>
           <IconArrowLeft width={16} height={16} color={colors.primary} />
         </TouchableOpacity>
         <TouchableOpacity style={themed($dateSelectWrapper)} activeOpacity={0.7} onPress={() => setIsCalendarVisible(true)}>
@@ -84,7 +96,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5}>
+        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handleNext}>
           <IconArrowRight width={16} height={16} color={colors.primary} />
         </TouchableOpacity>
 

@@ -96,7 +96,7 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
 
     // Header Colors & Icons
     let IconComponent = isWin ? IconTrophy : (isPending ? IconTicket : IconTicket); // Có thể thay icon ticket xám cho lost
-    let iconColor = isWin ? '#D97706' : (isPending ? '#3B82F6' : '#9CA3AF'); // Vàng đậm / Xanh / Xám
+    let iconColor = isWin ? '#D97706' : (isPending ? '#3B82F6' : '#3B82F6'); // Vàng đậm / Xanh / Xám
     let statusColor = isWin ? '#DC2626' : (isPending ? '#2563EB' : '#9CA3AF'); // Đỏ / Xanh / Xám
     let statusBg = isWin ? 'transparent' : (isPending ? '#EFF6FF' : '#F3F4F6'); // Badge bg
 
@@ -128,7 +128,7 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
               <IconComponent width={20} height={20} color={isWin ? '#B45309' : iconColor} />
             </View>
             <View style={{ marginLeft: spacing.sm }}>
-              <Text text={item.region.toUpperCase()} size="xxs" weight="medium" style={{ color: isWin ? '#B45309' : colors.palette.neutral500 }} />
+              <Text text={item.region.toUpperCase()} size="xxs" weight="medium" style={{ color: isWin ? '#B45309' : colors.text }} />
               <Text text={item.city} weight="bold" size="sm" style={{ color: isWin ? '#78350F' : colors.text }} />
             </View>
           </View>
@@ -152,8 +152,8 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
             style={[
               { marginTop: spacing.xs, letterSpacing: 2 },
               isWin && { color: '#DC2626' }, // Màu đỏ cho vé trúng
-              isPending && { color: colors.text },
-              isLost && { color: colors.palette.neutral400, textDecorationLine: 'line-through' } // Gạch ngang cho vé thua
+              isPending && { color: colors.palette.accent500 },
+              isLost && { color: colors.palette.accent500, textDecorationLine: 'line-through' } // Gạch ngang cho vé thua
             ]}
           />
           {/* Background trang trí chữ X mờ cho vé thua nếu cần */}
@@ -255,13 +255,13 @@ const $screenContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 // --- Filters ---
 const $filterScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.sm,
+  gap: spacing.xxs,
   paddingRight: spacing.md,
 });
 
 const $statusTab: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   paddingVertical: spacing.xs,
-  paddingHorizontal: spacing.lg,
+  paddingHorizontal: spacing.md,
   borderRadius: spacing.xxl,
   backgroundColor: colors.surface,
   borderWidth: 1,
