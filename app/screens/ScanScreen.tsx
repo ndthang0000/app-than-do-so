@@ -94,10 +94,41 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const statsRef = useRef(createDefaultStats());
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCapturingRef = useRef(false); // Tránh việc hàm chụp bị lặp chồng chéo
+  const isTakingPhotoRef = useRef(false);
+  const isStoppingRef = useRef(false);
   // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
   // console.log("scanResult: ", scanResult)
   // console.log("statsRef: ", statsRef.current)
+
+  const startAutoCapture = () => {
+    if (captureIntervalRef.current || isStoppingRef.current) return;
+
+    captureIntervalRef.current = setInterval(async () => {
+      // THÊM: Nếu isScanningActive đã false thì phải dừng ngay lập tức
+      if (!isScanningActive || !camera.current || isTakingPhotoRef.current || isProcessing || isStoppingRef.current) {
+        if (!isScanningActive) stopAutoCapture(); // Tự dọn dẹp nếu phát hiện trạng thái đã tắt
+        return;
+      }
+
+      isTakingPhotoRef.current = true;
+      try {
+        const photo = await camera.current.takePhoto({
+          flash: isFlashOn ? 'on' : 'off',
+          enableShutterSound: false,
+        });
+
+        // Kiểm tra lại lần nữa trước khi xử lý OCR nặng
+        if (isScanningActive && !isStoppingRef.current) {
+          processImageForOCR(photo.path, photo.width, photo.height, true);
+        }
+      } catch (err) {
+        console.error("Lỗi chụp ảnh tự động:", err);
+      } finally {
+        isTakingPhotoRef.current = false;
+      }
+    }, 500);
+  };
 
   const handleOCR = useRunOnJS((frameData) => {
     // Xử lý 7 Pipeline của bạn ở đây
@@ -145,24 +176,10 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       }
     });
 
-    if (current.code && !captureIntervalRef.current) {
+    if (current.code && !captureIntervalRef.current && isScanningActive && !hasFoundResult) {
       console.log("🚀 Đã tìm thấy Code, bắt đầu chế độ chụp ảnh 0.3s/lần");
 
-      captureIntervalRef.current = setInterval(async () => {
-        // Chỉ chụp nếu camera đã sẵn sàng và không đang bận xử lý tấm ảnh trước
-        if (camera.current && !isCapturingRef.current && isScanningActive) {
-          isCapturingRef.current = true;
-          try {
-            const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off' });
-            // Gọi hàm processImageForOCR đã có của bạn
-            await processImageForOCR(photo.path, photo.width, photo.height, true);
-          } catch (err) {
-            console.error("Lỗi chụp ảnh tự động:", err);
-          } finally {
-            isCapturingRef.current = false;
-          }
-        }
-      }, 300); // 0.3 giây
+      startAutoCapture();
     }
 
 
@@ -275,6 +292,9 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       // await Sharing.shareAsync(finalUri);
       const result = await PhotoRecognizer({ uri: finalUri });
       console.log("Kết quả OCR Ảnh:", result.resultText);
+      if (!result || !result.resultText) {
+        return;
+      }
       const current = fastParseFrame(result.resultText.split('\n'), scanResult?.date, true);
       if (!current) return;
       // LOGIC NÂNG CAO: Chống nhầm lẫn mmyyyy
@@ -353,6 +373,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   }
 
   const stopAutoCapture = () => {
+    isStoppingRef.current = true; // Chặn mọi yêu cầu chụp mới ngay lập tức
     if (captureIntervalRef.current) {
       clearInterval(captureIntervalRef.current);
       captureIntervalRef.current = null;
@@ -363,6 +384,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const toggleScanning = () => {
     if (isScanningActive) {
       stopAutoCapture();
+    } else {
+      isStoppingRef.current = false; // Mở lại khi bắt đầu scan mới
     }
     setIsScanningActive(!isScanningActive);
     setHasFoundResult(false);
