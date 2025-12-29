@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, ViewStyle, TextStyle, TouchableOpacity, Dimensions, Animated, StyleSheet, AppState, AppStateStatus } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useFrameProcessor } from 'react-native-vision-camera';
-import TextRecognition from '@react-native-ml-kit/text-recognition';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppTheme } from '@/theme/context';
 import type { ThemedStyle } from '@/theme/types';
@@ -10,7 +9,6 @@ import { Screen } from '@/components/Screen';
 import { Text } from "@/components/Text"
 import { Header } from '@/components/Header';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as Sharing from 'expo-sharing';
 import * as Haptics from "expo-haptics"
 import { useRunOnJS } from 'react-native-worklets-core';
 // Icons
@@ -20,11 +18,11 @@ import IconFlashOff from "@assets/svg/flash_off.svg";
 import IconGallery from "@assets/svg/gallery.svg";
 import IconLightBulb from "@assets/svg/lightbulb.svg";
 import Toast from 'react-native-toast-message';
-import { cleanAndParseLotteryData } from '@/utils/cleanLotteryData';
-import { useTextRecognition } from 'react-native-vision-camera-ocr-plus';
+import { PhotoRecognizer, useTextRecognition } from 'react-native-vision-camera-ocr-plus';
 import { ScanInfoOverlay } from '@/components/Scan/ScanInfoOverlay';
 import { ScanResult } from '@/constants/lotteryTicket';
 import { fastParseFrame, getMostFrequent } from '@/utils/fastParseFrame';
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
@@ -41,11 +39,14 @@ const widthPercent = 90;
 const heightPercent = (FRAME_HEIGHT / screenHeight) * 100;
 
 const CONFIDENCE_THRESHOLD = 5;
-const defaultStats = {
+
+
+const createDefaultStats = () => ({
   codes: {} as Record<string, number>,
   stations: {} as Record<string, number>,
   dates: {} as Record<string, number>,
-}
+});
+
 console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
 
 const toastConfig = {
@@ -90,15 +91,20 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const [hasFoundResult, setHasFoundResult] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult>({});
   const [appState, setAppState] = useState(AppState.currentState);
-  const statsRef = useRef(defaultStats);
+  const statsRef = useRef(createDefaultStats());
+  const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isCapturingRef = useRef(false); // Tránh việc hàm chụp bị lặp chồng chéo
   // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
+  // console.log("scanResult: ", scanResult)
+  // console.log("statsRef: ", statsRef.current)
 
   const handleOCR = useRunOnJS((frameData) => {
     // Xử lý 7 Pipeline của bạn ở đây
     if (!isScanningActive || hasFoundResult) return;
 
-    const current = fastParseFrame(frameData.split('\n'));
+
+    const current = fastParseFrame(frameData.split('\n'), scanResult?.date);
     if (!current) return;
 
     // LOGIC NÂNG CAO: Chống nhầm lẫn mmyyyy
@@ -139,6 +145,25 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       }
     });
 
+    if (current.code && !captureIntervalRef.current) {
+      console.log("🚀 Đã tìm thấy Code, bắt đầu chế độ chụp ảnh 0.3s/lần");
+
+      captureIntervalRef.current = setInterval(async () => {
+        // Chỉ chụp nếu camera đã sẵn sàng và không đang bận xử lý tấm ảnh trước
+        if (camera.current && !isCapturingRef.current && isScanningActive) {
+          isCapturingRef.current = true;
+          try {
+            const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off' });
+            // Gọi hàm processImageForOCR đã có của bạn
+            await processImageForOCR(photo.path, photo.width, photo.height, true);
+          } catch (err) {
+            console.error("Lỗi chụp ảnh tự động:", err);
+          } finally {
+            isCapturingRef.current = false;
+          }
+        }
+      }, 300); // 0.3 giây
+    }
 
 
     if (scanResult.code && scanResult.station && scanResult.date) {
@@ -147,11 +172,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
       // Bạn có thể navigate hoặc hiện Modal kết quả tại đây
     }
-  }, [isScanningActive]);
+  }, [isScanningActive, isCapturingRef]);
 
   const { scanText } = useTextRecognition({
     language: 'latin',
-    frameSkipThreshold: 5,
+    frameSkipThreshold: 10,
     useLightweightMode: true,
     scanRegion: {
       left: `${leftPercent}%`,
@@ -247,11 +272,49 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
 
 
-      await Sharing.shareAsync(finalUri);
-      const result = await TextRecognition.recognize(finalUri,);
-      console.log("raw text:", result.text)
-      const parsedData = cleanAndParseLotteryData(result.text);
-      console.log("parsedData", parsedData);
+      // await Sharing.shareAsync(finalUri);
+      const result = await PhotoRecognizer({ uri: finalUri });
+      console.log("Kết quả OCR Ảnh:", result.resultText);
+      const current = fastParseFrame(result.resultText.split('\n'), scanResult?.date, true);
+      if (!current) return;
+      // LOGIC NÂNG CAO: Chống nhầm lẫn mmyyyy
+      if (current.code && current.date) {
+        const dateNumbers = current.date.replace(/[^0-9]/g, ''); // Ví dụ: 12052024
+
+        // Nếu mã vé giống hệt 6 số cuối của ngày (052024) hoặc 6 số đầu (120520)
+        // thì khả năng cao là detect nhầm ngày tháng
+        if (dateNumbers.includes(current.code)) {
+          return;
+        }
+      }
+
+      // 1. Cập nhật kho dữ liệu (Thêm vào chứ không đè)
+      const keys: (keyof ScanResult)[] = ['code', 'station', 'date'];
+
+      keys.forEach(key => {
+        const val = current[key];
+        if (!val) return;
+
+        // Tăng đếm tần suất
+        const statsKey = key === 'code' ? 'codes' : key === 'station' ? 'stations' : 'dates';
+        statsRef.current[statsKey][val] = (statsRef.current[statsKey][val] || 0) + 5; // 5 điểm cho ảnh chụp
+
+        // 2. TÌM GIÁ TRỊ TỐT NHẤT TRONG KHO
+        const bestMatch = getMostFrequent(statsRef.current[statsKey]);
+
+        // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
+        // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
+        if (bestMatch.freq >= CONFIDENCE_THRESHOLD) {
+          setScanResult(prev => {
+            // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
+            if (prev[key] !== bestMatch.value) {
+              return { ...prev, [key]: bestMatch.value };
+            }
+            return prev;
+          });
+        }
+      });
+
 
     } catch (error) {
       console.error("Lỗi OCR:", error);
@@ -289,9 +352,22 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   }
 
+  const stopAutoCapture = () => {
+    if (captureIntervalRef.current) {
+      clearInterval(captureIntervalRef.current);
+      captureIntervalRef.current = null;
+      console.log("⏹️ Đã dừng chụp ảnh tự động.");
+    }
+  };
+
   const toggleScanning = () => {
+    if (isScanningActive) {
+      stopAutoCapture();
+    }
     setIsScanningActive(!isScanningActive);
     setHasFoundResult(false);
+    setScanResult({}); // Reset kết quả khi scan lại
+    statsRef.current = createDefaultStats(); // Reset kho dữ liệu
   };
 
   if (!hasPermission || !device) {
@@ -327,7 +403,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
     const unsubscribeFocus = navigation.addListener('focus', () => {
       setIsScanningActive(false); // Reset state luôn tại đây
-      statsRef.current = defaultStats;
+      statsRef.current = createDefaultStats();
       setScanResult({});
       setShouldRenderCamera(true);
     });
@@ -337,7 +413,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       setIsFlashOn(false);
       setIsScanningActive(false);
       setShouldRenderCamera(false);
-      statsRef.current = defaultStats;
+      statsRef.current = createDefaultStats();
       setScanResult({});
     });
 
@@ -353,6 +429,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     };
   }, [navigation]);
 
+  // Dọn dẹp khi unmount component hoặc khi tắt scan tay
+  useEffect(() => {
+    return () => stopAutoCapture();
+  }, []);
+
   return (
     <View style={themed($container)} ref={containerRef}>
       <Camera
@@ -363,6 +444,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         frameProcessor={frameProcessor}
         pixelFormat={'yuv'}
         torch={isFlashOn ? 'on' : 'off'}
+        exposure={-1}
+        photo={true}
       />
 
       <View style={themed($overlayContainer)}>

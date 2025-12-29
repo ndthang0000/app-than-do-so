@@ -1,4 +1,4 @@
-import { LOTTERY_SCHEDULE, PROVINCE_REGEX_MAP } from "@/constants/lotterySchedule";
+import { LOTTERY_SCHEDULE, FUZZY_PROVINCE_KEYWORDS } from "@/constants/lotterySchedule";
 
 
 export const cleanAndParseLotteryData = (rawText: string) => {
@@ -47,17 +47,17 @@ export const cleanAndParseLotteryData = (rawText: string) => {
       if (daySchedule) {
         for (const provinceName of daySchedule.provinces) {
           // Lấy danh sách Regex cho tỉnh hiện tại từ Map
-          const regexList = PROVINCE_REGEX_MAP[provinceName] || [];
+          const regex = FUZZY_PROVINCE_KEYWORDS[provinceName];
 
           // Kiểm tra xem có bất kỳ regex nào khớp với dòng nào trong text không
-          const isMatch = lines.some(line =>
-            regexList.some(regex => regex.test(line))
-          );
+          // const isMatch = lines.some(line =>
+          //   regex.test(line)
+          // );
 
-          if (isMatch) {
-            ticketStation = provinceName;
-            detectedRegion = regionEntry.regionName;
-          }
+          // if (isMatch) {
+          //   ticketStation = provinceName;
+          //   detectedRegion = regionEntry.regionName;
+          // }
         }
       }
     }
