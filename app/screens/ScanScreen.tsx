@@ -38,7 +38,11 @@ const leftPercent = 5;
 const widthPercent = 90;
 const heightPercent = (FRAME_HEIGHT / screenHeight) * 100;
 
-const CONFIDENCE_THRESHOLD = 5;
+const CONFIDENCE_THRESHOLD = {
+  code: 8,
+  station: 3,
+  date: 5,
+};
 
 
 const createDefaultStats = () => ({
@@ -150,7 +154,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
 
     // 1. Cập nhật kho dữ liệu (Thêm vào chứ không đè)
-    const keys: (keyof ScanResult)[] = ['code', 'station', 'date'];
+    const keys = ['code', 'station', 'date'] as const;
 
     keys.forEach(key => {
       const val = current[key];
@@ -165,7 +169,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
       // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
       // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
-      if (bestMatch.freq >= CONFIDENCE_THRESHOLD) {
+      if (bestMatch.freq >= CONFIDENCE_THRESHOLD[key]) {
         setScanResult(prev => {
           // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
           if (prev[key] !== bestMatch.value) {
@@ -309,7 +313,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       }
 
       // 1. Cập nhật kho dữ liệu (Thêm vào chứ không đè)
-      const keys: (keyof ScanResult)[] = ['code', 'station', 'date'];
+      const keys = ['code', 'station', 'date'] as const;
 
       keys.forEach(key => {
         const val = current[key];
@@ -324,7 +328,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
         // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
         // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
-        if (bestMatch.freq >= CONFIDENCE_THRESHOLD) {
+        if (bestMatch.freq >= CONFIDENCE_THRESHOLD[key]) {
           setScanResult(prev => {
             // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
             if (prev[key] !== bestMatch.value) {
