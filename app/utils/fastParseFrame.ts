@@ -19,6 +19,7 @@ const getSimilarity = (str1: string, str2: string) => {
   return (maxLength - distance(str1, str2)) / maxLength;
 };
 
+
 export const findStationWithLevenshtein = (lines: string[], dateStr?: string): string | undefined => {
   'worklet';
   if (!dateStr) return undefined;
@@ -40,8 +41,7 @@ export const findStationWithLevenshtein = (lines: string[], dateStr?: string): s
     const daily = region.schedule.find(s => s.date === dayOfWeek);
     return daily ? [...acc, ...daily.provinces] : acc;
   }, [] as string[]);
-  candidateProvinces.push("Miền Bắc", "Hà Nội", "TP.HCM"); // Các đài phổ biến/đặc thù
-
+  candidateProvinces.push("Miền Bắc"); // Các đài phổ biến/đặc thù
   // 2. Duyệt qua từng dòng text để tìm kết quả tốt nhất
   let bestMatch = { province: '', score: 0 };
   const SIMILARITY_THRESHOLD = 0.65; // Độ chính xác trên 65% thì mới chấp nhận
@@ -63,11 +63,9 @@ export const findStationWithLevenshtein = (lines: string[], dateStr?: string): s
       // Cách 2: Nếu Regex trượt, dùng Levenshtein cho text "rác"
       // Chúng ta trích xuất một đoạn con trong cleanedLine có độ dài tương đương target để so sánh
       // hoặc so sánh trực tiếp nếu cleanedLine chứa các ký tự của target
-      if (cleanedLine.includes(target.substring(0, 3))) { // "Mồi" thử 3 chữ cái đầu
-        const score = getSimilarity(cleanedLine, target);
-        if (score > bestMatch.score) {
-          bestMatch = { province, score };
-        }
+      const score = getSimilarity(cleanedLine, target);
+      if (score > bestMatch.score) {
+        bestMatch = { province, score };
       }
     }
   }
@@ -79,20 +77,7 @@ export const findStationWithLevenshtein = (lines: string[], dateStr?: string): s
 const isValidLotteryDate = (dateString: string): boolean => {
   'worklet'; // Nếu dùng trong frame processor
 
-  // 1. Chuyển đổi các dấu phân cách về chuẩn '/' để dễ parse
-  const normalizedDate = dateString.replace(/[-.]/g, '/');
-  const formats = ['dd/MM/yyyy', 'dd/M/yyyy'];
-  let parsedDate: Date | null = null;
-
-  for (const fmt of formats) {
-    const temp = parse(normalizedDate, fmt, new Date());
-    if (isValid(temp)) {
-      parsedDate = temp;
-      break;
-    }
-  }
-
-  if (!parsedDate) return false;
+  let parsedDate: Date | null = parse(dateString, 'dd-MM-yyyy', new Date());
 
   // Kiểm tra xem format có đúng là ngày thật không (loại bỏ 31/02/2024...)
   if (!isValid(parsedDate)) return false;
@@ -114,14 +99,6 @@ const isValidLotteryDate = (dateString: string): boolean => {
   if (parsedDate.getFullYear() > now.getFullYear() + 1) return false;
 
   return true;
-};
-
-const cleanTextForOCR = (text: string) => {
-  'worklet';
-  return text
-    .toUpperCase()
-    .replace(/[\u0300-\u036f]/g, '') // Xóa dấu
-    .replace(/[^A-Z\s]/g, ''); // Chỉ giữ lại chữ cái và khoảng trắng
 };
 
 export const getMostFrequent = (stats: Record<string, number>) => {
@@ -152,16 +129,8 @@ const findStationWithSchedule = (lines: string[], dateStr?: string): string | un
   if (!dateStr) return undefined;
 
   // --- GIỮ NGUYÊN LOGIC PARSE NGÀY ---
-  const normalizedDate = dateStr.replace(/[-.]/g, '/');
-  const formats = ['dd/MM/yyyy', 'dd/M/yyyy'];
-  let parsedDate: Date | null = null;
-  for (const fmt of formats) {
-    const temp = parse(normalizedDate, fmt, new Date());
-    if (isValid(temp)) {
-      parsedDate = temp;
-      break;
-    }
-  }
+  let parsedDate: Date | null = parse(dateStr, 'dd-MM-yyyy', new Date());
+
   if (!parsedDate) return undefined;
 
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -228,19 +197,24 @@ export const fastParseFrame = (lines: string[], currentDate: string | undefined,
     // 2. Tìm NGÀY (Regex tối giản chỉ tìm định dạng dd-mm-yyyy)
     if (!result.date) {
       // Regex tìm định dạng dd/mm/yyyy hoặc dd-mm-yyyy
-      const dateMatch = line.match(/\d{2}[/-]\d{1,2}[/-]\d{4}/);
+      const dateMatch = line.match(/\d{2}[-./]\d{1,2}[-./]\d{4}/);
 
       if (dateMatch) {
         const potentialDate = dateMatch[0];
 
         // CHỈ LẤY NẾU NGÀY HỢP LỆ
         if (isValidLotteryDate(potentialDate)) {
-          result.date = potentialDate;
+
+          // result.date = potentialDate. Conver to dd-mm-yyyy
+          const [d, m, y] = potentialDate.split(/[-./]/).map(Number);
+          const day = d.toString().padStart(2, '0');
+          const month = m.toString().padStart(2, '0');
+          result.date = `${day}-${month}-${y}`;
         }
       }
     }
     if (isImage) {
-      result.station = findStationWithSchedule(lines, result.date || currentDate);
+      result.station = findStationWithLevenshtein(lines, result.date || currentDate);
     }
     // Nếu đã đủ 3 thông tin chính thì thoát sớm để tiết kiệm CPU
   }

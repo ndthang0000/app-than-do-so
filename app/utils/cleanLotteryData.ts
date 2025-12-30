@@ -173,5 +173,3 @@ export const cleanAndParseLotteryData = (rawText: string) => {
 // Năm Bảy Sau Chin Ba Bốn
 // EN934"
 // EN`;
-
-// console.log("đây rồi okla: ", cleanAndParseLotteryData(textSample));

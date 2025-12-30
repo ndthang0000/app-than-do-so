@@ -102,8 +102,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const isStoppingRef = useRef(false);
   // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
-  // console.log("scanResult: ", scanResult)
-  // console.log("statsRef: ", statsRef.current)
 
   const startAutoCapture = () => {
     if (captureIntervalRef.current || isStoppingRef.current) return;
@@ -259,7 +257,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         const actualWidth = fW / scale;
         const actualHeight = fH / scale;
 
-        console.log("DEBUG CROP:", { actualOriginY, scale, offsetY, fY });
+        // console.log("DEBUG CROP:", { actualOriginY, scale, offsetY, fY });
 
         if (actualWidth > 0 && actualHeight > 0) {
           const manipulatedImage = await ImageManipulator.manipulateAsync(
@@ -513,7 +511,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
                   (x, y) => {
                     frameLayout.current.x = x;
                     frameLayout.current.y = y;
-                    console.log("Tọa độ khung thực tế:", { x, y });
                   },
                 );
               }
