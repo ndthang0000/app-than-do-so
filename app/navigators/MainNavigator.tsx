@@ -68,6 +68,7 @@ export function MainNavigator() {
           name="Result"
           component={ResultScreen}
           options={{
+            tabBarStyle: { display: "none" },
             tabBarLabel: ({ focused }) => {
               return <Text text="Kết quả" style={themed([$tabBarLabel, { color: focused ? colors.tint : colors.tintInactive }])} />
             },

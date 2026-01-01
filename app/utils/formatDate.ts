@@ -40,10 +40,16 @@ export const loadDateFnsLocale = () => {
   }
 }
 
-export const formatDate = (date: string, dateFormat?: string, options?: Options) => {
+export const formatDate = (date: Date, dateFormat?: string, options?: Options) => {
   const dateOptions = {
     ...options,
     locale: dateFnsLocale,
   }
-  return format(parseISO(date), dateFormat ?? "MMM dd, yyyy", dateOptions)
+  return format(date, dateFormat || "dd-MM-yyyy", dateOptions) // Default format is DD-MM-YYYY
+}
+
+export const getDayOfWeek = (date: Date): string => { // return Thứ 2, Thứ 3, ...
+  const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+  return days[date.getDay()];
+
 }

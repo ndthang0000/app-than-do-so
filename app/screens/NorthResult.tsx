@@ -1,10 +1,11 @@
+import { CountDownDraw } from "@/components/ResultTicket/CountDownDraw"
 import { LotteryResultTable } from "@/components/ResultTicket/LotteryResultTable"
 import { Screen } from "@/components/Screen"
 
 const NORTH_PROVINCES = [
   {
     code: "HNI",
-    name: "Huế",
+    name: "Hà Nội",
     prizes: {
       G8: ["12"],
       G7: ["34", "66", "31", "78"],
@@ -21,8 +22,10 @@ const NORTH_PROVINCES = [
 
 export const NorthResult = () => {
   return <>
-    <Screen preset="scroll" safeAreaEdges={["bottom"]}>
-      <LotteryResultTable provinces={NORTH_PROVINCES} region="north" />
+    <Screen preset="scroll" safeAreaEdges={["bottom"]}
+    >
+      <CountDownDraw targetTime="18:15" regionName="XỔ SỐ MIỀN BẮC" />
+      {/* <LotteryResultTable provinces={NORTH_PROVINCES} region="north" /> */}
     </Screen>
   </>
 }

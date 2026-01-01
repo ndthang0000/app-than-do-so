@@ -11,6 +11,9 @@ import { Text } from "@/components/Text";
 import { ResultTicketTab } from "@/components/ResultTicket/ResultTicketTab";
 import { useState } from "react";
 import { DatePicker } from "@/components/DatePicker";
+import { addDays, format, isAfter, isToday, parseISO, startOfDay } from "date-fns";
+import Toast from "react-native-toast-message";
+import { getRegionStatus } from "@/constants/lotterySchedule";
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
   // how to get params from _props.route.params
@@ -22,9 +25,40 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
     new Date().toISOString().split("T")[0],
   );
 
+
+  // Kiểm tra xem ngày đang chọn có phải hôm nay không để chặn nút Next
+  const isSelectedToday = isToday(parseISO(currentSelectedDate));
+
+  let regionDrawStatus = {
+    north: isSelectedToday ? getRegionStatus('north') : 'FINISHED',
+    central: isSelectedToday ? getRegionStatus('central') : 'FINISHED',
+    south: isSelectedToday ? getRegionStatus('south') : 'FINISHED',
+  }
+
+  let tittleHeader = "Kết quả xổ số";
+  if (regionDrawStatus.south === 'LIVE') {
+    tittleHeader = "🔴 LIVE xổ số - MN";
+  }
+  else if (regionDrawStatus.central === 'LIVE') {
+    tittleHeader = "🔴 LIVE xổ số - MT";
+  }
+  else if (regionDrawStatus.north === 'LIVE') {
+    tittleHeader = "🔴 LIVE xổ số - MB";
+  }
   const handleDateSelect = (dateString: string) => {
-    setCurrentSelectedDate(dateString);
-    setIsCalendarVisible(false); // Đóng Modal sau khi chọn
+    // Chặn nếu người dùng cố tình chọn ngày tương lai từ DatePicker (nếu DatePicker chưa chặn)
+    if (isAfter(parseISO(dateString), startOfDay(new Date()))) {
+      Toast.show({
+        type: 'error',
+        text1: `Ngày quá xa so với thực tế!`,
+        position: 'bottom',
+        bottomOffset: 150,
+        visibilityTime: 1000,
+      });
+    } else {
+      setCurrentSelectedDate(dateString);
+    }
+    setIsCalendarVisible(false);
   };
 
   const formatDateDisplay = (dateString: string) => {
@@ -53,15 +87,16 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   };
 
   const handlePrevious = () => {
-    const date = new Date(currentSelectedDate);
-    date.setDate(date.getDate() - 1);
-    setCurrentSelectedDate(date.toISOString().split("T")[0]);
+    const date = parseISO(currentSelectedDate);
+    setCurrentSelectedDate(format(addDays(date, -1), "yyyy-MM-dd"));
   }
 
   const handleNext = () => {
-    const date = new Date(currentSelectedDate);
-    date.setDate(date.getDate() + 1);
-    setCurrentSelectedDate(date.toISOString().split("T")[0]);
+    // Nếu là hôm nay thì không làm gì cả
+    if (isSelectedToday) return;
+
+    const date = parseISO(currentSelectedDate);
+    setCurrentSelectedDate(format(addDays(date, 1), "yyyy-MM-dd"));
   }
 
   const SettingPressableIcon = () => {
@@ -75,7 +110,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   return (
     <>
       <Header
-        title="Kết quả xổ số"
+        title={tittleHeader}
         safeAreaEdges={["top"]}
         RightActionComponent={<SettingPressableIcon />}
         backgroundColor={colors.background}
@@ -84,11 +119,11 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
       />
       <View style={themed($dateWrapper)}>
         <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handlePrevious}>
-          <IconArrowLeft width={16} height={16} color={colors.primary} />
+          <IconArrowLeft width={16} height={16} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity style={themed($dateSelectWrapper)} activeOpacity={0.7} onPress={() => setIsCalendarVisible(true)}>
           <View style={themed($calendarWrapper)}>
-            <IconCalendar width={24} height={24} color={colors.background} />
+            <IconCalendar width={22} height={22} color={colors.background} />
           </View>
           <View>
             <Text text={formatDateDisplay(currentSelectedDate).dayTitle} style={{ color: colors.textDim }} weight="semiBold" />
@@ -96,8 +131,8 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handleNext}>
-          <IconArrowRight width={16} height={16} color={colors.primary} />
+        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handleNext} disabled={isSelectedToday}>
+          <IconArrowRight width={16} height={16} color={isSelectedToday ? colors.palette.neutral400 : colors.text} />
         </TouchableOpacity>
 
         <Modal
@@ -132,11 +167,12 @@ const $dateWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: spacing.xs,
+  paddingHorizontal: spacing.xs,
+  paddingVertical: spacing.xs,
   backgroundColor: colors.surface,
   borderWidth: 0.5,
   marginHorizontal: spacing.md,
-  marginVertical: spacing.sm,
+  marginVertical: spacing.xs,
   borderColor: colors.border,
   borderRadius: spacing.xl,
 })
@@ -144,14 +180,16 @@ const $dateWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
 const $dateSelectWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xs,
+  justifyContent: "center",
+  alignItems: "center",
 
 })
 const $arrowWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   padding: spacing.sm,
   borderRadius: 22,
   backgroundColor: colors.background,
-  height: 44,
-  width: 44,
+  height: 40,
+  width: 40,
   alignItems: "center",
   justifyContent: "center",
 })
@@ -161,8 +199,8 @@ const $calendarWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   padding: spacing.sm,
   borderRadius: 22,
   backgroundColor: colors.primary,
-  height: 44,
-  width: 44,
+  height: 40,
+  width: 40,
   alignItems: "center",
   justifyContent: "center",
   //box shadow

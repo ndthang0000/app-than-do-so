@@ -1,9 +1,11 @@
+import { addMinutes, differenceInMinutes, isAfter, isBefore, parse, startOfDay } from "date-fns";
 import { Region, Weekday } from "./lotteryTicket";
 
 interface LotteryScheduleEntry {
   region: Region;
   regionName: string;
   time: string; // 0 (Sunday) to 6 (Saturday)
+  end?: string;
   schedule: {
     date: Weekday,
     provinces: string[],
@@ -14,6 +16,7 @@ export const LOTTERY_SCHEDULE: LotteryScheduleEntry[] = [
     region: "south",
     regionName: "Xổ Số Miền Nam",
     time: "16:15",
+    end: '16h35',
     schedule: [
       { date: "monday", provinces: ["TP.HCM", "Đồng Tháp", "Cà Mau"] },
       { date: "tuesday", provinces: ["Bến Tre", "Vũng Tàu", "Bạc Liêu"] },
@@ -28,8 +31,9 @@ export const LOTTERY_SCHEDULE: LotteryScheduleEntry[] = [
     region: "central",
     regionName: "Xổ Số Miền Trung",
     time: "17:15",
+    end: '17h35',
     schedule: [
-      { date: "monday", provinces: ["TT.Huế", "Phú Yên"] },
+      { date: "monday", provinces: ["TT-Huế", "Phú Yên"] },
       { date: "tuesday", provinces: ["Đắk Lắk", "Quảng Nam"] },
       { date: "wednesday", provinces: ["Đà Nẵng", "Khánh Hòa"] },
       { date: "thursday", provinces: ["Bình Định", "Quảng Trị", "Quảng Bình"] },
@@ -43,6 +47,7 @@ export const LOTTERY_SCHEDULE: LotteryScheduleEntry[] = [
     region: "north",
     regionName: "Xổ Số Miền Bắc",
     time: "18:15",
+    end: '18h35',
     schedule: [
       { date: "monday", provinces: ["Hà Nội"] },
       { date: "tuesday", provinces: ["Quảng Ninh"] },
@@ -55,6 +60,35 @@ export const LOTTERY_SCHEDULE: LotteryScheduleEntry[] = [
   },
 ]
 
+export type DrawStatus = {
+  type: 'UPCOMING' | 'LIVE' | 'FINISHED';
+  countdownMinutes?: number;
+}
+
+export const getRegionStatus = (region: string): DrawStatus => {
+  const now = new Date();
+  const today = startOfDay(now);
+
+  const regionTime = LOTTERY_SCHEDULE.find(r => r.region === region)?.time || "18:15";
+
+  // Convert "16:15" thành đối tượng Date của ngày hôm nay
+  const startTime = parse(regionTime, "HH:mm", today);
+  const endTime = addMinutes(startTime, 25); // Giả định xổ trong 25p
+  const liveThreshold = addMinutes(startTime, -5); // Trước 5p
+
+  if (isBefore(now, liveThreshold)) {
+    return {
+      type: 'UPCOMING',
+      countdownMinutes: differenceInMinutes(startTime, now),
+    };
+  }
+
+  if (isAfter(now, liveThreshold) && isBefore(now, endTime)) {
+    return { type: 'LIVE' };
+  }
+
+  return { type: 'FINISHED' };
+};
 
 // Chuyển sang mảng các chuỗi để tính khoảng cách Levenshtein
 export const FUZZY_PROVINCE_KEYWORDS: Record<string, string[]> = {

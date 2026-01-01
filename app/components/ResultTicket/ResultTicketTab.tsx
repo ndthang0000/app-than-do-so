@@ -16,7 +16,7 @@ export function ResultTicketTab() {
         tabBarInactiveTintColor: colors.textDim,
         tabBarIndicatorStyle: {
           backgroundColor: colors.primary,
-          height: 3,
+          height: 2,
         },
         tabBarStyle: {
           backgroundColor: colors.surface,

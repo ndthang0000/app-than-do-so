@@ -5,7 +5,7 @@ import { Text } from "../Text";
 import { ThemedStyle } from "@/theme/types";
 import LinearGradient from "react-native-linear-gradient"
 import { DisplayMode } from "./LotteryResultTable";
-import { Region } from "@/constants/lotteryTicket";
+import { LOTTERY_TYPOGRAPHY, Region } from "@/constants/lotteryTicket";
 
 function PrizeNumbers({
   numbers,
@@ -56,119 +56,100 @@ function PrizeNumbers({
 export function ResultRow({ prize, provinces, index, flex, region, displayMode }: {
   provinces: ProvinceResult[],
   region?: Region,
-  prize: PrizeKey
+  prize: PrizeKey,
   index: number,
   flex: number,
   displayMode: DisplayMode
 }) {
-  const isDB = prize === "DB"
-  // convert G3 ->G.3 for display purpose
-  const displayPrize = prize.startsWith("G") && prize.length === 2 ? `${prize[0]}.${prize[1]}` : "ĐB";
-
   const { themed, theme: { colors } } = useAppTheme();
 
-  let bgColor: any = colors.palette.neutral200;
-  if (index % 2 === 0) {
-    bgColor = colors.surface;
-  }
-  if (isDB) {
-    bgColor = "#FCFBD9";
-  }
+  // 1. Logic chuẩn bị dữ liệu & trạng thái
+  const isDB = prize === "DB";
+  const isNorth = region === "north";
+  const displayPrize = isDB ? "ĐB" : (prize.startsWith("G") ? `${prize[0]}.${prize[1]}` : prize);
 
-  const needGridLayout = region === "north" ? ["G3", "G5"] : [];
+  const isHighlighted = (isNorth && prize === 'G7') || (!isNorth && prize === 'G8');
+  const needGridLayout = isNorth && ["G3", "G5"].includes(prize);
 
-  let isHighlighted = false;
-  if (region === "north" && prize === 'G7') {
-    isHighlighted = true;
-  }
-  else {
-    if (prize === 'G8') {
-      isHighlighted = true;
+  // 2. Xác định màu nền
+  const getBgColor = () => {
+    if (isDB) return "#FCFBD9";
+    return index % 2 === 0 ? colors.surface : colors.palette.neutral200;
+  };
+
+  // 3. Hàm render số chung để tái sử dụng
+  const renderNumbers = (numbers: string[]) => {
+    let displayNumbers = numbers;
+    if (displayMode === "last2") displayNumbers = numbers.map(n => n.slice(-2));
+    else if (displayMode === "last3") displayNumbers = numbers.map(n => n.slice(-3));
+
+    const textStyle = {
+      color: isDB || isHighlighted ? colors.primary : colors.text,
+      ...(isDB ? LOTTERY_TYPOGRAPHY.db : LOTTERY_TYPOGRAPHY.standard),
+    };
+
+    if (needGridLayout) {
+      return (
+        <PrizeNumbers
+          numbers={displayNumbers}
+          isTwoRow={true}
+          textStyle={textStyle}
+        />
+      );
     }
-  }
+
+    return (
+      <View style={isNorth ? themed($northNumbersContainer) : null}>
+        {displayNumbers.map((num, idx) => (
+          <View key={`${num}-${idx}`} style={themed($cellNumberWrapper)}>
+            <Text text={num} style={textStyle} />
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
-    <View
-      style={themed([$wrapper, { backgroundColor: bgColor }])}
-    >
-      {/* G.8 -> ĐB*: first cell*/}
-      <View style={themed([$cellPricingWrapper, { paddingVertical: isDB ? 16 : 6 }])}>
+    <View style={themed([$wrapper, { backgroundColor: getBgColor() }])}>
+      {/* CỘT GIẢI (Bên trái) */}
+      <View style={themed([$cellPricingWrapper, { paddingVertical: isDB ? 12 : 8 }])}>
         <Text
           text={displayPrize}
           style={{
             color: isDB ? '#854D0E' : colors.textDim,
-            fontWeight: isDB ? "800" : "700",
-            fontSize: isDB ? 20 : 16,
+            ...(isDB ? LOTTERY_TYPOGRAPHY.prizeLabelDB : LOTTERY_TYPOGRAPHY.prizeLabel)
           }}
         />
       </View>
 
+      {/* CỘT SỐ (Bên phải - các tỉnh) */}
       {provinces.map((p) => {
-        const numbers = p.prizes[prize]
-        // Điều chỉnh hiển thị theo chế độ
-        let displayNumbers = numbers;
-        if (displayMode === "last2") {
-          displayNumbers = numbers.map(num => num.slice(-2));
-        }
-        else if (displayMode === "last3") {
-          displayNumbers = numbers.map(num => num.slice(-3));
-        }
-        if (!isDB) {
+        const content = renderNumbers(p.prizes[prize]);
+
+        if (isDB) {
           return (
-            <View key={p.code} style={themed([...(region === "north" ? [$cellProvinceNorthWrapper] : [$cellProvinceWrapper]), { flex: flex }])} >
-              {needGridLayout.length > 0 ? (
-                <PrizeNumbers
-                  numbers={displayNumbers}
-                  isTwoRow={needGridLayout.includes(prize)}
-                  textStyle={{
-                    color: isHighlighted ? colors.primary : colors.text,
-                    fontWeight: "800",
-                    fontSize: 16,
-                  }}
-                />
-              ) : (
-                displayNumbers.map((num) => (
-                  <View key={num} style={themed($cellNumberWrapper)}>
-                    <Text
-                      text={num}
-                      style={{
-                        color: isHighlighted ? colors.primary : colors.text,
-                        fontWeight: "800",
-                        fontSize: 16,
-                      }}
-                    />
-                  </View>
-                ))
-              )}
-            </View>
-          )
+            <LinearGradient
+              key={p.code}
+              colors={["#f4f2a4ff", "#ffffff", "#f5f4c6ff"]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={themed([$cellProvinceWrapper, { flex: flex }])}
+            >
+              {content}
+            </LinearGradient>
+          );
         }
+
         return (
-          <LinearGradient
+          <View
             key={p.code}
-            colors={["#f4f2a4ff", "#ffffff", "#f5f4c6ff"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={themed([$cellProvinceWrapper, { flex: flex }])}
+            style={themed([isNorth ? $cellProvinceNorthWrapper : $cellProvinceWrapper, { flex: flex }])}
           >
-            {displayNumbers.map((num) => {
-              return (
-                <View key={num} style={themed($cellNumberWrapper)} >
-                  <Text
-                    text={num}
-                    style={{
-                      color: colors.primary,
-                      fontWeight: "900",
-                      fontSize: 20,
-                    }}
-                  />
-                </View>
-              )
-            })}
-          </LinearGradient>
-        )
+            {content}
+          </View>
+        );
       })}
     </View>
-  )
+  );
 }
 
 const $wrapper: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
@@ -191,7 +172,8 @@ const $cellPricingWrapper: ThemedStyle<ViewStyle> = ({ colors }) => ({
 const $cellNumberWrapper: ThemedStyle<ViewStyle> = ({ }) => ({
   justifyContent: "center",
   alignItems: "center",
-
+  minWidth: 30, // Đảm bảo các số không bị dính vào nhau
+  paddingVertical: 1,
 })
 
 const $cellProvinceWrapper: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -210,3 +192,12 @@ const $cellProvinceNorthWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) 
   borderColor: colors.separator,
   paddingVertical: 10
 })
+
+const $northNumbersContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  justifyContent: "space-evenly",
+  width: "100%",
+  gap: spacing.xs,
+})
+
