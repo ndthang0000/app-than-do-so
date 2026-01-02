@@ -32,6 +32,8 @@ import { ThemeProvider } from "./theme/context"
 import { customFontsToLoad } from "./theme/typography"
 import { loadDateFnsLocale } from "./utils/formatDate"
 import * as storage from "./utils/storage"
+import { Provider } from "react-redux"
+import { store } from "./store"
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
 // Web linking configuration
@@ -93,6 +95,7 @@ export function App() {
 
   // otherwise, we're ready to render the app
   return (
+    <Provider store={store}>
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <KeyboardProvider>
         <AuthProvider>
@@ -105,6 +108,7 @@ export function App() {
           </ThemeProvider>
         </AuthProvider>
       </KeyboardProvider>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </Provider>
   )
 }

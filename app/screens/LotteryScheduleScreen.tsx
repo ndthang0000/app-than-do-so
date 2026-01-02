@@ -22,8 +22,8 @@ export const LotteryScheduleScreen: React.FC<AppStackScreenProps<'Schedule'>> = 
   // Giả định hôm nay là Thứ 4 để giống design (hoặc dùng new Date().getDay() thực tế)
 
   const BackIcon = () => (
-    <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5}>
-      <IconBack width={24} height={24} color={colors.text} />
+    <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
+      <IconBack width={22} height={22} color={colors.text} />
     </TouchableOpacity>
   );
 

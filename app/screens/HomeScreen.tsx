@@ -284,12 +284,12 @@ const $imageRegion: ThemedStyle<ImageStyle> = ({ spacing }) => ({
 
 const $tagWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   position: 'absolute',
-  top: 5,
-  right: 5,
+  top: 6,
+  right: 6,
   backgroundColor: colors.palette.neutral200,
-  paddingHorizontal: spacing.xs,
-  paddingVertical: spacing.xxxs,
-  borderRadius: spacing.sm,
+  paddingHorizontal: spacing.sm,
+  paddingVertical: 1,
+  borderRadius: spacing.md,
   borderColor: colors.palette.neutral300,
   borderWidth: 1,
 })

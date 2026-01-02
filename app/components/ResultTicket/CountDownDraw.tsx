@@ -1,47 +1,46 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect } from "react"
 import { TextStyle, View, ViewStyle, TouchableOpacity, ScrollView } from "react-native"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import { ThemedStyle } from "@/theme/types"
-import { differenceInSeconds, parse, startOfDay, format } from "date-fns"
+import { format } from "date-fns"
 import { vi } from "date-fns/locale"
 import IconBell from "@assets/svg/bell-active.svg"
 import IconLocation from "@assets/svg/location.svg"
 import IconCalendar from "@assets/svg/calendar.svg"
+import { useAppSelector } from "@/store" // Hook store của bạn
+import { Region } from "@/constants/lotteryTicket"
 
 interface CountDownDrawProps {
-  targetTime: string // "18:15"
-  regionName: string // "Xổ số Miền Bắc"
-  drawDate?: Date    // Ngày quay thưởng, mặc định là hôm nay
+  region: Region// Dùng key để lấy dữ liệu từ Redux
+  regionName: string
+  drawDate?: Date
 }
 
-export const CountDownDraw = ({ targetTime, regionName, drawDate = new Date() }: CountDownDrawProps) => {
-  const { themed, theme: { colors, spacing } } = useAppTheme()
-  const [diff, setDiff] = useState({ h: "00", m: "00", s: "00" })
+export const CountDownDraw = ({ region, regionName, drawDate = new Date() }: CountDownDrawProps) => {
+  const { themed, theme: { colors } } = useAppTheme()
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date()
-      const target = parse(targetTime, "HH:mm", startOfDay(now))
-      let seconds = differenceInSeconds(target, now)
+  // 1. Lấy dữ liệu từ Redux
+  const status = useAppSelector((state) => state.timeDraw.regions[region])
+  const targetTime = status.targetTime
 
-      if (seconds <= 0) {
-        setDiff({ h: "00", m: "00", s: "00" })
-        return
-      }
+  // 2. Hàm tính toán hiển thị trực tiếp (không cần useState/useEffect cho diff nữa)
+  const getDisplayTime = () => {
+    const totalSeconds = status.countdownSeconds || 0
 
-      setDiff({
-        h: Math.floor(seconds / 3600).toString().padStart(2, "0"),
-        m: Math.floor((seconds % 3600) / 60).toString().padStart(2, "0"),
-        s: (seconds % 60).toString().padStart(2, "0"),
-      })
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [targetTime])
+    if (totalSeconds <= 0) return { h: "00", m: "00", s: "00" }
+
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, "0")
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0")
+    const s = (totalSeconds % 60).toString().padStart(2, "0")
+
+    return { h, m, s }
+  }
+
+  const diff = getDisplayTime()
 
   const TimeBlock = ({ value, label }: { value: string; label: string }) => (
     <View style={themed($timeBlockContainer)}>
-
       <View style={themed($timeBox)}>
         <Text text={value} style={themed($timeValue)} weight="bold" />
       </View>
@@ -55,7 +54,6 @@ export const CountDownDraw = ({ targetTime, regionName, drawDate = new Date() }:
       contentContainerStyle={themed($contentContainer)}
       showsVerticalScrollIndicator={false}
     >
-      {/* Badge Vùng Miền */}
       <View style={themed($regionBadge)}>
         <IconLocation width={12} height={12} color="#EAB308" />
         <Text text={regionName.toUpperCase()} style={themed($regionText)} weight="bold" />
@@ -64,7 +62,6 @@ export const CountDownDraw = ({ targetTime, regionName, drawDate = new Date() }:
       <Text text="Sắp tới giờ mở thưởng" style={themed($title)} size="xl" weight="bold" />
       <Text text={`Kết quả sẽ được cập nhật tự động lúc ${targetTime}`} style={themed($subTitle)} size="xxs" />
 
-      {/* Khối Đếm Ngược */}
       <View style={themed($timerContainer)}>
         <TimeBlock value={diff.h} label="GIỜ" />
         <Text text=":" style={themed($separator)} weight="bold" />
@@ -73,7 +70,6 @@ export const CountDownDraw = ({ targetTime, regionName, drawDate = new Date() }:
         <TimeBlock value={diff.s} label="GIÂY" />
       </View>
 
-      {/* Khối Kỳ Quay Thưởng (Mới bổ sung cho giống UI) */}
       <View style={themed($drawInfoCard)}>
         <View style={themed($drawDateLeft)}>
           <View style={themed($calendarIconBg)}>
@@ -91,7 +87,6 @@ export const CountDownDraw = ({ targetTime, regionName, drawDate = new Date() }:
         </View>
       </View>
 
-      {/* Nút Nhận Thông Báo */}
       <TouchableOpacity style={themed($notifyButton)} activeOpacity={0.8}>
         <Text text="NHẬN THÔNG BÁO KHI CÓ KẾT QUẢ" style={themed($notifyText)} weight="bold" size="xs" />
         <IconBell width={20} height={20} color="#C00000" />

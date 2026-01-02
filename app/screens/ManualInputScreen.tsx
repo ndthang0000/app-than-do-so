@@ -199,7 +199,7 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
   // ... (Giữ nguyên các hàm BackIcon, renderCodeInput, toggleCitySelection, renderCityChips)
 
   const BackIcon = () => (
-    <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5}>
+    <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
       <IconBack width={24} height={24} color={colors.text} />
     </TouchableOpacity>
   );

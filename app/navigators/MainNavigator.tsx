@@ -17,6 +17,9 @@ import { ResultScreen } from "@/screens/ResultScreen"
 import { ScanScreen } from "@/screens/ScanScreen"
 import { MyTicketScreen } from "@/screens/MyTicket"
 import { DemoShowroomScreen } from "@/screens/DemoShowroomScreen/DemoShowroomScreen"
+import { useEffect } from "react"
+import { useAppDispatch } from "@/store"
+import { tick } from "@/store/slices/timeDrawSlice"
 
 const Tab = createBottomTabNavigator<HomeTabParamList>()
 
@@ -33,6 +36,21 @@ export function MainNavigator() {
     themed,
     theme: { colors },
   } = useAppTheme()
+
+  const dispatch = useAppDispatch()
+
+  useEffect(() => {
+    // Chạy ngay lập tức khi app load
+    dispatch(tick())
+
+    // Thiết lập đếm nhịp mỗi giây
+    const timer = setInterval(() => {
+      dispatch(tick())
+    }, 1000)
+
+    // Quan trọng: Clear interval khi component unmount
+    return () => clearInterval(timer)
+  }, [dispatch])
 
   return (
     <EpisodeProvider>

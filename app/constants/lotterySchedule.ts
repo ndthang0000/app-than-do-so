@@ -1,4 +1,4 @@
-import { addMinutes, differenceInMinutes, isAfter, isBefore, parse, startOfDay } from "date-fns";
+import { addMinutes, differenceInMinutes, differenceInSeconds, isAfter, isBefore, parse, startOfDay } from "date-fns";
 import { Region, Weekday } from "./lotteryTicket";
 
 interface LotteryScheduleEntry {
@@ -62,7 +62,9 @@ export const LOTTERY_SCHEDULE: LotteryScheduleEntry[] = [
 
 export type DrawStatus = {
   type: 'UPCOMING' | 'LIVE' | 'FINISHED';
+  targetTime: string;
   countdownMinutes?: number;
+  countdownSeconds?: number;
 }
 
 export const getRegionStatus = (region: string): DrawStatus => {
@@ -70,24 +72,26 @@ export const getRegionStatus = (region: string): DrawStatus => {
   const today = startOfDay(now);
 
   const regionTime = LOTTERY_SCHEDULE.find(r => r.region === region)?.time || "18:15";
-
   // Convert "16:15" thành đối tượng Date của ngày hôm nay
   const startTime = parse(regionTime, "HH:mm", today);
   const endTime = addMinutes(startTime, 25); // Giả định xổ trong 25p
   const liveThreshold = addMinutes(startTime, -5); // Trước 5p
 
+
   if (isBefore(now, liveThreshold)) {
     return {
       type: 'UPCOMING',
       countdownMinutes: differenceInMinutes(startTime, now),
+      countdownSeconds: differenceInSeconds(startTime, now),
+      targetTime: regionTime,
     };
   }
 
   if (isAfter(now, liveThreshold) && isBefore(now, endTime)) {
-    return { type: 'LIVE' };
+    return { type: 'LIVE', targetTime: regionTime };
   }
 
-  return { type: 'FINISHED' };
+  return { type: 'FINISHED', targetTime: regionTime };
 };
 
 // Chuyển sang mảng các chuỗi để tính khoảng cách Levenshtein

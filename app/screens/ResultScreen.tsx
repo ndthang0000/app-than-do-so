@@ -4,6 +4,7 @@ import { useAppTheme } from "@/theme/context";
 import { Modal, Pressable, TouchableOpacity, View, ViewStyle } from "react-native";
 import IconSetting from "@assets/svg/setting.svg";
 import IconArrowLeft from "@assets/svg/arrow-left.svg";
+import IconBack from "@assets/svg/arrow-left.svg";
 import IconArrowRight from "@assets/svg/arrow-right.svg";
 import IconCalendar from "@assets/svg/calendar.svg";
 import { ThemedStyle } from "@/theme/types";
@@ -14,35 +15,33 @@ import { DatePicker } from "@/components/DatePicker";
 import { addDays, format, isAfter, isToday, parseISO, startOfDay } from "date-fns";
 import Toast from "react-native-toast-message";
 import { getRegionStatus } from "@/constants/lotterySchedule";
+import { useAppDispatch, useAppSelector } from "@/store";
+import { setDateSelected } from "@/store/slices/timeDrawSlice";
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
   // how to get params from _props.route.params
 
   const { themed, theme: { colors, spacing } } = useAppTheme();
+  const { navigation } = _props;
+  const dispatch = useAppDispatch()
 
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
-  const [currentSelectedDate, setCurrentSelectedDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const dateSelected = useAppSelector((state) => state.timeDraw.dateSelected);
 
 
   // Kiểm tra xem ngày đang chọn có phải hôm nay không để chặn nút Next
-  const isSelectedToday = isToday(parseISO(currentSelectedDate));
+  const isSelectedToday = isToday(parseISO(dateSelected));
 
-  let regionDrawStatus = {
-    north: isSelectedToday ? getRegionStatus('north') : 'FINISHED',
-    central: isSelectedToday ? getRegionStatus('central') : 'FINISHED',
-    south: isSelectedToday ? getRegionStatus('south') : 'FINISHED',
-  }
+  let regionDrawStatus = useAppSelector((state) => state.timeDraw.regions);
 
   let tittleHeader = "Kết quả xổ số";
-  if (regionDrawStatus.south === 'LIVE') {
+  if (regionDrawStatus.south.type === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MN";
   }
-  else if (regionDrawStatus.central === 'LIVE') {
+  else if (regionDrawStatus.central.type === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MT";
   }
-  else if (regionDrawStatus.north === 'LIVE') {
+  else if (regionDrawStatus.north.type === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MB";
   }
   const handleDateSelect = (dateString: string) => {
@@ -56,7 +55,8 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
         visibilityTime: 1000,
       });
     } else {
-      setCurrentSelectedDate(dateString);
+      // Dispatch action to update dateSelected in the Redux store
+      dispatch(setDateSelected(dateString));
     }
     setIsCalendarVisible(false);
   };
@@ -87,16 +87,16 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   };
 
   const handlePrevious = () => {
-    const date = parseISO(currentSelectedDate);
-    setCurrentSelectedDate(format(addDays(date, -1), "yyyy-MM-dd"));
+    const date = parseISO(dateSelected);
+    dispatch(setDateSelected(format(addDays(date, -1), "yyyy-MM-dd")));
   }
 
   const handleNext = () => {
     // Nếu là hôm nay thì không làm gì cả
     if (isSelectedToday) return;
 
-    const date = parseISO(currentSelectedDate);
-    setCurrentSelectedDate(format(addDays(date, 1), "yyyy-MM-dd"));
+    const date = parseISO(dateSelected);
+    dispatch(setDateSelected(format(addDays(date, 1), "yyyy-MM-dd")));
   }
 
   const SettingPressableIcon = () => {
@@ -107,12 +107,19 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
     )
   }
 
+  const BackIcon = () => (
+    <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
+      <IconBack width={22} height={22} color={colors.text} />
+    </TouchableOpacity>
+  );
+
   return (
     <>
       <Header
         title={tittleHeader}
         safeAreaEdges={["top"]}
         RightActionComponent={<SettingPressableIcon />}
+        LeftActionComponent={<BackIcon />}
         backgroundColor={colors.background}
         containerStyle={{ paddingHorizontal: spacing.md, backgroundColor: colors.surface }}
         titleStyle={{ color: colors.text, fontWeight: "bold", fontSize: 20 }}
@@ -126,8 +133,8 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
             <IconCalendar width={22} height={22} color={colors.background} />
           </View>
           <View>
-            <Text text={formatDateDisplay(currentSelectedDate).dayTitle} style={{ color: colors.textDim }} weight="semiBold" />
-            <Text text={formatDateDisplay(currentSelectedDate).formattedDate} style={{ color: colors.text }} weight="bold" />
+            <Text text={formatDateDisplay(dateSelected).dayTitle} style={{ color: colors.textDim }} weight="semiBold" />
+            <Text text={formatDateDisplay(dateSelected).formattedDate} style={{ color: colors.text }} weight="bold" />
           </View>
         </TouchableOpacity>
 
@@ -151,7 +158,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
                         */}
               <DatePicker
                 onDateSelect={handleDateSelect}
-                initialDate={currentSelectedDate}
+                initialDate={dateSelected}
               />
               {/* Thêm nút Đóng/Xác nhận nếu cần */}
             </View>

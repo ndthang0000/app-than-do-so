@@ -188,11 +188,17 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
     );
   };
 
+  const BackIcon = () => (
+    <TouchableOpacity onPress={() => _props.navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
+      <IconBack width={22} height={22} color={colors.text} />
+    </TouchableOpacity>
+  );
+
   return (
     <>
       <Header
         title="LỊCH SỬ DÒ SỐ"
-        LeftActionComponent={<TouchableOpacity onPress={() => _props.navigation.goBack()}><IconBack width={24} height={24} color={colors.text} /></TouchableOpacity>}
+        LeftActionComponent={<BackIcon />}
         safeAreaEdges={["top"]}
         backgroundColor={colors.background}
         containerStyle={{ paddingHorizontal: spacing.md, backgroundColor: colors.surface }}

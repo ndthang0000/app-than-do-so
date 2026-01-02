@@ -1,5 +1,8 @@
+import { CountDownDraw } from "@/components/ResultTicket/CountDownDraw"
 import { LotteryResultTable } from "@/components/ResultTicket/LotteryResultTable"
 import { Screen } from "@/components/Screen"
+import { useAppSelector } from "@/store"
+import { isToday, parseISO } from "date-fns"
 
 const CENTRAL_PROVINCES = [
   {
@@ -51,10 +54,26 @@ const CENTRAL_PROVINCES = [
 
 
 export const CentraResult = () => {
-  return <>
-    <Screen preset="scroll" safeAreaEdges={["bottom"]}>
+  const status = useAppSelector((state) => state.timeDraw.regions["central"])
+  const dateSelected = useAppSelector((state) => state.timeDraw.dateSelected);
 
-      <LotteryResultTable provinces={CENTRAL_PROVINCES} region="central" />
-    </Screen>
-  </>
+  const isSelectedToday = isToday(parseISO(dateSelected));
+
+  const isUpcoming = status.type === "UPCOMING" && isSelectedToday
+  const isLive = status.type === "LIVE"
+  const isFinished = status.type === "FINISHED"
+
+  return <>
+      <Screen
+        preset="scroll"
+        safeAreaEdges={["bottom"]}
+        style={{ ...(isUpcoming ? { backgroundColor: "#C00000" } : {}) }}
+      >
+        {
+          isUpcoming ?
+            <CountDownDraw regionName="XỔ SỐ MIỀN TRUNG" region="central" />
+            : <LotteryResultTable provinces={CENTRAL_PROVINCES} region="central" />
+        }
+      </Screen>
+    </>
 }
