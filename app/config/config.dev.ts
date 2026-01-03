@@ -5,6 +5,12 @@
  *
  * https://reactnative.dev/docs/security#storing-sensitive-info
  */
+
+// Nếu dùng Android Emulator
+// API_URL=http://10.0.2.2:3425/api
+
+// Nếu dùng thiết bị thật (thay bằng IP máy bạn)
+// API_URL=http://192.168.1.16:3425/api
 export default {
-  API_URL: "https://api.rss2json.com/v1/",
+  API_URL: "http://192.168.1.16:3425/api",
 }

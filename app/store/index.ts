@@ -1,12 +1,32 @@
-import { configureStore } from "@reduxjs/toolkit"
+import { combineReducers, configureStore } from "@reduxjs/toolkit"
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
+import { persistStore, persistReducer } from "redux-persist"
 import { timeDrawSlice } from "./slices/timeDrawSlice"
+import { authSlice } from "./slices/authSlice"
+import { reduxStorage } from "@/utils/storage"
+
+const authPersistConfig = {
+  key: "auth",
+  storage: reduxStorage,
+  whitelist: ["authToken", "refreshToken", "deviceId"], // Chỉ lưu những thứ này
+}
+
+const rootReducer = combineReducers({
+  auth: persistReducer(authPersistConfig, authSlice.reducer),
+  timeDraw: timeDrawSlice.reducer,
+  // auth: authSlice.reducer,
+  // các reducer khác không cần persist thì để bình thường
+})
 
 export const store = configureStore({
-  reducer: {
-    timeDraw: timeDrawSlice.reducer,
-  },
+  reducer: rootReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: false, // Bắt buộc phải tắt khi dùng redux-persist
+    }),
 })
+
+export const persistor = persistStore(store)
 
 // Khai báo type để dùng Hook cho chuẩn TypeScript
 export type RootState = ReturnType<typeof store.getState>

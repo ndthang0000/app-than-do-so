@@ -30,8 +30,6 @@ export type HomeTabParamList = {
 // App Stack Navigator types
 export type AppStackParamList = {
   Welcome: undefined
-  Login: undefined
-  Demo: NavigatorScreenParams<DemoTabParamList>
   Main: NavigatorScreenParams<HomeTabParamList>
   ManualInput: undefined
   Schedule: undefined

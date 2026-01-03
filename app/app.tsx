@@ -24,7 +24,6 @@ import * as Linking from "expo-linking"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
-import { AuthProvider } from "./context/AuthContext"
 import { initI18n } from "./i18n"
 import { AppNavigator } from "./navigators/AppNavigator"
 import { useNavigationPersistence } from "./navigators/navigationUtilities"
@@ -33,9 +32,9 @@ import { customFontsToLoad } from "./theme/typography"
 import { loadDateFnsLocale } from "./utils/formatDate"
 import * as storage from "./utils/storage"
 import { Provider } from "react-redux"
-import { store } from "./store"
+import { persistor, store } from "./store"
+import { PersistGate } from "redux-persist/lib/integration/react"
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
-
 // Web linking configuration
 const prefix = Linking.createURL("/")
 const config = {
@@ -96,19 +95,19 @@ export function App() {
   // otherwise, we're ready to render the app
   return (
     <Provider store={store}>
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <KeyboardProvider>
-        <AuthProvider>
+      <PersistGate loading={null} persistor={persistor}>
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <KeyboardProvider>
           <ThemeProvider >
             <AppNavigator
               linking={linking}
               initialState={initialNavigationState}
               onStateChange={onNavigationStateChange}
             />
-          </ThemeProvider>
-        </AuthProvider>
-      </KeyboardProvider>
-      </SafeAreaProvider>
+            </ThemeProvider>
+          </KeyboardProvider>
+        </SafeAreaProvider>
+      </PersistGate>
     </Provider>
   )
 }

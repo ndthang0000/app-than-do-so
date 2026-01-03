@@ -8,9 +8,7 @@ import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 
 import Config from "@/config"
-import { useAuth } from "@/context/AuthContext"
 import { ErrorBoundary } from "@/screens/ErrorScreen/ErrorBoundary"
-import { LoginScreen } from "@/screens/LoginScreen"
 import { useAppTheme } from "@/theme/context"
 
 import type { AppStackParamList, NavigationProps } from "./navigationTypes"
@@ -21,6 +19,8 @@ import { LotteryScheduleScreen } from "@/screens/LotteryScheduleScreen"
 import { NotificationScreen } from "@/screens/NotificationScreen"
 import Toast from "react-native-toast-message"
 import { getToastConfig } from "@/components/toastConfig"
+import { WelcomeScreen } from "@/screens/WelcomeScreen"
+import { useAppSelector } from "@/store"
 
 /**
  * This is a list of all the route names that will exit the app if the back button
@@ -32,11 +32,23 @@ const exitRoutes = Config.exitRoutes
 const Stack = createNativeStackNavigator<AppStackParamList>()
 
 const AppStack = () => {
-  const { isAuthenticated } = useAuth()
 
   const {
     theme: { colors },
   } = useAppTheme()
+
+  // Lấy trạng thái nạp dữ liệu của redux-persist
+  // Lưu ý: path này phụ thuộc vào cách bạn đặt rootReducer, 
+  // thường là state.auth._persist.rehydrated hoặc dùng selector riêng
+  const isRehydrated = useAppSelector((state) => state.auth._persist?.rehydrated)
+
+  // Logic kiểm tra: Nếu có authToken thì coi như đã login
+  const token = useAppSelector((state) => state.auth.authToken)
+  const isAuthenticated = !!token
+
+  // Quan trọng: Nếu chưa nạp xong dữ liệu từ MMKV, 
+  // hãy trả về null hoặc SplashScreen để tránh render WelcomeScreen quá sớm
+  if (!isRehydrated) return null
 
   return (
     <Stack.Navigator
@@ -47,10 +59,10 @@ const AppStack = () => {
           backgroundColor: colors.background,
         },
       }}
-      initialRouteName={isAuthenticated ? "Main" : "Login"}
     >
       {isAuthenticated ? (
         <>
+          {/* Khi isAuthenticated = true, bộ màn hình này mới tồn tại */}
           <Stack.Screen name="Main" component={MainNavigator} />
           <Stack.Screen name="ManualInput" component={ManualInputScreen} />
           <Stack.Screen name="Schedule" component={LotteryScheduleScreen} />
@@ -58,12 +70,10 @@ const AppStack = () => {
         </>
       ) : (
         <>
-          <Stack.Screen name="Login" component={LoginScreen} />
+          {/* Khi isAuthenticated = false, chỉ màn hình Welcome tồn tại */}
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
         </>
       )}
-
-      {/** 🔥 Your screens go here */}
-      {/* IGNITE_GENERATOR_ANCHOR_APP_STACK_SCREENS */}
     </Stack.Navigator>
   )
 }

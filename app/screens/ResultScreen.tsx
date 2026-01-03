@@ -14,7 +14,6 @@ import { useState } from "react";
 import { DatePicker } from "@/components/DatePicker";
 import { addDays, format, isAfter, isToday, parseISO, startOfDay } from "date-fns";
 import Toast from "react-native-toast-message";
-import { getRegionStatus } from "@/constants/lotterySchedule";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setDateSelected } from "@/store/slices/timeDrawSlice";
 

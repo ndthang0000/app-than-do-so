@@ -2,7 +2,6 @@ import { TextStyle, ViewStyle } from "react-native"
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { EpisodeProvider } from "@/context/EpisodeContext"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { HomeTabParamList } from "./navigationTypes"
@@ -53,7 +52,6 @@ export function MainNavigator() {
   }, [dispatch])
 
   return (
-    <EpisodeProvider>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -151,8 +149,7 @@ export function MainNavigator() {
             ),
           }}
         />
-      </Tab.Navigator>
-    </EpisodeProvider>
+    </Tab.Navigator>
   )
 }
 

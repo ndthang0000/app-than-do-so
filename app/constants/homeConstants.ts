@@ -61,9 +61,9 @@ export const getStatusTag = (region: Region) => {
   const startMinutes = schedules[region as keyof typeof schedules];
   const startTime = addMinutes(todayStart, startMinutes);
   const liveStartTime = addMinutes(startTime, -5); // Trước 5p
-  const liveEndTime = addMinutes(startTime, 20);   // Quay trong khoảng 20p
+  const liveEndTime = addMinutes(startTime, 25);   // Quay trong khoảng 25p
 
-  // 1. Kiểm tra trạng thái LIVE (Từ -5p đến +20p so với giờ bắt đầu)
+  // 1. Kiểm tra trạng thái LIVE (Từ -5p đến +25p so với giờ bắt đầu)
   if (isAfter(now, liveStartTime) && !isAfter(now, liveEndTime)) {
     return {
       label: '🔴 LIVE',

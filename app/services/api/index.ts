@@ -1,37 +1,21 @@
-/**
- * This Api class lets you define an API endpoint and methods to request
- * data and process it.
- *
- * See the [Backend API Integration](https://docs.infinite.red/ignite-cli/boilerplate/app/services/#backend-api-integration)
- * documentation for more details.
- */
 import { ApiResponse, ApisauceInstance, create } from "apisauce"
-
 import Config from "@/config"
-import type { EpisodeItem } from "@/services/api/types"
-
 import { GeneralApiProblem, getGeneralApiProblem } from "./apiProblem"
-import type { ApiConfig, ApiFeedResponse } from "./types"
+import type { ApiConfig } from "./types"
+import { store } from "@/store"
+import axios from "axios"
+import { loginByDevice, logout, setAuthToken } from "@/store/slices/authSlice"
 
-/**
- * Configuring the apisauce instance.
- */
 export const DEFAULT_API_CONFIG: ApiConfig = {
   url: Config.API_URL,
   timeout: 10000,
 }
 
-/**
- * Manages all requests to the API. You can use this class to build out
- * various requests that you need to call from your backend API.
- */
+console.log(DEFAULT_API_CONFIG)
 export class Api {
   apisauce: ApisauceInstance
   config: ApiConfig
 
-  /**
-   * Set up our API instance. Keep this lightweight!
-   */
   constructor(config: ApiConfig = DEFAULT_API_CONFIG) {
     this.config = config
     this.apisauce = create({
@@ -41,42 +25,88 @@ export class Api {
         Accept: "application/json",
       },
     })
+
+    this.setupInterceptors()
+  }
+
+  setupInterceptors() {
+    // --- Request Interceptor: Gắn Access Token vào Header ---
+    this.apisauce.axiosInstance.interceptors.request.use(
+      async (config) => {
+        const token = store.getState().auth.authToken
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+      },
+      (error) => Promise.reject(error),
+    )
+
+    // --- Response Interceptor: Xử lý Refresh Token khi gặp lỗi 401 ---
+    this.apisauce.axiosInstance.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config
+
+        // Nếu lỗi 401 và chưa từng thử refresh cho request này
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true
+
+          try {
+            // Gọi API refresh token riêng biệt bằng axios thuần để tránh loop vô tận
+            const refreshToken = store.getState().auth.refreshToken
+            const deviceId = store.getState().auth.deviceId // Lấy từ store của bạn
+
+            const res = await axios.post(`${this.config.url}/auth/refresh`, {
+              refreshToken,
+              deviceId
+            })
+
+            const { accessToken, newRefreshToken } = res.data
+
+            // Lưu token mới vào Redux
+            store.dispatch(setAuthToken({
+              token: accessToken,
+              refreshToken: newRefreshToken
+            }))
+
+            // Cập nhật header và thực hiện lại request cũ
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`
+            return this.apisauce.axiosInstance(originalRequest)
+          } catch (refreshError) {
+            try {
+              // Lưu ý: Dùng unwrap() để lấy dữ liệu trực tiếp từ thunk
+              const result = await store.dispatch(loginByDevice()).unwrap()
+
+              // Cập nhật Token mới vào request cũ và thử lại lần cuối
+              originalRequest.headers.Authorization = `Bearer ${result.accessToken}`
+              return this.apisauce.axiosInstance(originalRequest)
+            } catch (reLoginError) {
+              // Nếu đến cả Login bằng Device cũng lỗi (VD: server sập, Device bị ban)
+              // Lúc này mới thực sự cho logout
+              store.dispatch(logout())
+              return Promise.reject(reLoginError)
+            }
+          }
+        }
+        return Promise.reject(error)
+      },
+    )
   }
 
   /**
-   * Gets a list of recent React Native Radio episodes.
+   * Ví dụ hàm Device Login với Signature bảo mật
    */
-  async getEpisodes(): Promise<{ kind: "ok"; episodes: EpisodeItem[] } | GeneralApiProblem> {
-    // make the api call
-    const response: ApiResponse<ApiFeedResponse> = await this.apisauce.get(
-      `api.json?rss_url=https%3A%2F%2Ffeeds.simplecast.com%2FhEI_f9Dx`,
-    )
+  async deviceLogin(payload: { deviceId: string; timestamp: number; signature: string }): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
+    const response: ApiResponse<any> = await this.apisauce.post("/auth/device-login", payload)
 
-    // the typical ways to die when calling an api
     if (!response.ok) {
       const problem = getGeneralApiProblem(response)
       if (problem) return problem
     }
 
-    // transform the data into the format we are expecting
-    try {
-      const rawData = response.data
-
-      // This is where we transform the data into the shape we expect for our model.
-      const episodes: EpisodeItem[] =
-        rawData?.items.map((raw) => ({
-          ...raw,
-        })) ?? []
-
-      return { kind: "ok", episodes }
-    } catch (e) {
-      if (__DEV__ && e instanceof Error) {
-        console.error(`Bad data: ${e.message}\n${response.data}`, e.stack)
-      }
-      return { kind: "bad-data" }
-    }
+    return { kind: "ok", data: response.data }
   }
 }
 
-// Singleton instance of the API for convenience
 export const api = new Api()
