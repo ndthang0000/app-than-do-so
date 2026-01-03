@@ -6,6 +6,7 @@ import { ThemedStyle } from "@/theme/types";
 import LinearGradient from "react-native-linear-gradient"
 import { DisplayMode } from "./LotteryResultTable";
 import { LOTTERY_TYPOGRAPHY, Region } from "@/constants/lotteryTicket";
+import { LotteryResult } from "@/store/slices/lotterySlice";
 
 function PrizeNumbers({
   numbers,
@@ -54,7 +55,7 @@ function PrizeNumbers({
 }
 
 export function ResultRow({ prize, provinces, index, flex, region, displayMode }: {
-  provinces: ProvinceResult[],
+  provinces: LotteryResult[],
   region?: Region,
   prize: PrizeKey,
   index: number,
@@ -129,7 +130,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode }
         if (isDB) {
           return (
             <LinearGradient
-              key={p.code}
+              key={p._id}
               colors={["#f4f2a4ff", "#ffffff", "#f5f4c6ff"]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={themed([$cellProvinceWrapper, { flex: flex }])}
@@ -141,7 +142,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode }
 
         return (
           <View
-            key={p.code}
+            key={p._id}
             style={themed([isNorth ? $cellProvinceNorthWrapper : $cellProvinceWrapper, { flex: flex }])}
           >
             {content}

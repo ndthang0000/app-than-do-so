@@ -3,6 +3,7 @@ import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import { persistStore, persistReducer } from "redux-persist"
 import { timeDrawSlice } from "./slices/timeDrawSlice"
 import { authSlice } from "./slices/authSlice"
+import { lotterySlice } from "./slices/lotterySlice"
 import { reduxStorage } from "@/utils/storage"
 
 const authPersistConfig = {
@@ -14,7 +15,7 @@ const authPersistConfig = {
 const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authSlice.reducer),
   timeDraw: timeDrawSlice.reducer,
-  // auth: authSlice.reducer,
+  lottery: lotterySlice.reducer,
   // các reducer khác không cần persist thì để bình thường
 })
 

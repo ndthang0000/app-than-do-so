@@ -155,7 +155,6 @@ export const ManualInputScreen: React.FC<AppStackScreenProps<'ManualInput'>> = f
   // ------------------------------------------
 
   const changeWeek = useCallback((direction: 'PREV' | 'NEXT') => {
-    // Console.log ra sẽ chỉ thấy 1 lần gọi hàm này (Re-render 1)
 
     const newDate = new Date(selectedDate);
     if (direction === 'PREV') {

@@ -31,6 +31,7 @@ const palette = {
   secondary300: "#90CAF9",
   secondary400: "#64B5F6",
   secondary500: "#1976D2",
+  secondary600: "#1565C0",
 
   // Error
   angry100: "#FDECEA",

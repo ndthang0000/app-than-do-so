@@ -84,12 +84,10 @@ export function clear(): void {
 
 export const reduxStorage: Storage = {
   setItem: (key: string, value: string): Promise<boolean> => {
-    console.log(`[MMKV] Đang lưu key: ${key}`, "value: ", value);
     storage.set(key, value)
     return Promise.resolve(true)
   },
   getItem: (key: string): Promise<string | null> => {
-    console.log(`[MMKV] Đang get key: ${key}`);
     const value = storage.getString(key)
     return Promise.resolve(value ?? null)
   },

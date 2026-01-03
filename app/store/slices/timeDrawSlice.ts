@@ -12,7 +12,6 @@ interface TimeDrawState {
     south: DrawStatus
   }
   lastUpdated: string,
-  dateSelected: string,
 }
 
 const initialState: TimeDrawState = {
@@ -21,7 +20,6 @@ const initialState: TimeDrawState = {
     central: { type: "FINISHED", targetTime: timeCentral },
     south: { type: "FINISHED", targetTime: timeSouth },
   },
-  dateSelected: new Date().toISOString().split("T")[0],
   lastUpdated: new Date().toISOString(),
 }
 
@@ -36,11 +34,9 @@ export const timeDrawSlice = createSlice({
       state.regions.south = getRegionStatus('south')
       state.lastUpdated = new Date().toISOString()
     },
-    setDateSelected: (state, action: { payload: string }) => {
-      state.dateSelected = action.payload
-    }
+
   },
 })
 
-export const { tick, setDateSelected } = timeDrawSlice.actions
+export const { tick } = timeDrawSlice.actions
 export default timeDrawSlice.reducer

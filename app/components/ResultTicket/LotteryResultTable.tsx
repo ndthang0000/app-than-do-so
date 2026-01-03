@@ -4,16 +4,19 @@ import { ResultRow } from "./ResultRow"
 import { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { LotoTable } from "./LotoTable"
 import { Region } from "@/constants/lotteryTicket"
 import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
+import { useAppDispatch, useAppSelector } from "@/store"
+import { fetchLotteryIfNeeded } from "@/store/slices/lotterySlice"
+import { useIsFocused } from "@react-navigation/native"
+import { HeaderRowNorth } from "./HeaderRowNorth"
 
 export type DisplayMode = "full" | "last2" | "last3"
 
 type Props = {
-  provinces: ProvinceResult[]
-  region?: Region
+  region: Region
 }
 
 const PRIZES: PrizeKey[] = [
@@ -25,11 +28,15 @@ const PRIZES_NORTH: PrizeKey[] = [
 ]
 
 
-export function LotteryResultTable({ provinces, region }: Props) {
+export function LotteryResultTable({ region }: Props) {
 
   const $containerInsets = useSafeAreaInsetsStyle(["bottom"])
   const { themed, theme: { colors } } = useAppTheme();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("full")
+  const dispatch = useAppDispatch()
+  const isFocused = useIsFocused()
+  const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
+  const provinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || [];
 
   const handleChangeDisplayMode = (mode: DisplayMode) => {
     setDisplayMode(mode)
@@ -39,40 +46,21 @@ export function LotteryResultTable({ provinces, region }: Props) {
 
   const choosePrizes = region === "north" ? PRIZES_NORTH : PRIZES;
 
-  //calculate loto data
-  provinces.forEach((p) => {
-    const lotoSet = new Set<string>();
-    Object.values(p.prizes).forEach((nums) => {
-      nums.forEach((num) => {
-        // get last 2 digits
-        if (num.length >= 2) {
-          lotoSet.add(num.slice(-2));
-        }
-      });
-    });
-    p.loto = {}
-    lotoSet.forEach((num) => {
-      const head = num.charAt(0);
-      if (!p.loto![head]) {
-        p.loto![head] = [];
-      }
-      p.loto![head].push(num.charAt(1));
-    });
-    /*
-    p.loto={
-      "0": [1,2,3],
-      "1": [4,5,6],
-      ...
-      "9": [7,8,9]
-    }
-     */
 
-  })
+  useEffect(() => {
+    // Mỗi khi dateSelected hoặc region thay đổi, hàm này sẽ tự kiểm tra cache
+    if (!isFocused) return;
+
+    dispatch(fetchLotteryIfNeeded({
+      date: dateSelected,
+      region: region,
+    }))
+  }, [dateSelected, dispatch, isFocused])
 
   return (
     <View style={[themed($tableWrapper), $containerInsets]}>
 
-      {region !== "north" && <HeaderRow provinces={provinces} flex={calculateFlex} />}
+      {region == "north" ? <HeaderRowNorth provinces={provinces} /> : <HeaderRow provinces={provinces} flex={calculateFlex} />}
       <View style={{ borderLeftWidth: 1, borderColor: colors.separator, borderBottomWidth: 1 }}>
 
         {

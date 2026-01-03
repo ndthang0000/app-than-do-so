@@ -53,7 +53,6 @@ export const loginByDevice = createAsyncThunk(
         return rejectWithValue(response)
       }
     } catch (e: any) {
-      console.log(e)
       return rejectWithValue(e.message)
     }
   },

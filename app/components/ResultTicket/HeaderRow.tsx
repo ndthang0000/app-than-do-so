@@ -2,6 +2,7 @@ import { useAppTheme } from "@/theme/context";
 import { TextStyle, View, ViewStyle } from "react-native";
 import { Text } from "../Text";
 import { ThemedStyle } from "@/theme/types";
+import { LotteryResult } from "@/store/slices/lotterySlice";
 
 export type PrizeKey =
   | "G8" | "G7" | "G6" | "G5"
@@ -16,7 +17,7 @@ export type ProvinceResult = {
 }
 
 type Props = {
-  provinces: ProvinceResult[],
+  provinces: LotteryResult[],
   flex: number
 }
 
@@ -29,8 +30,8 @@ export function HeaderRow({ provinces, flex }: Props) {
         <Text style={themed($textDai)} text="Đài" />
       </View>
       {provinces.map((p) => (
-        <View key={p.code} style={[themed($cellWrapper), { flex: flex }]} >
-          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 18 }} text={p.name} />
+        <View key={p._id} style={[themed($cellWrapper), { flex: flex }]} >
+          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 18 }} text={p.station} />
         </View>
       ))}
     </View>

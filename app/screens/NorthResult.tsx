@@ -2,7 +2,10 @@ import { CountDownDraw } from "@/components/ResultTicket/CountDownDraw"
 import { LotteryResultTable } from "@/components/ResultTicket/LotteryResultTable"
 import { Screen } from "@/components/Screen"
 import { useAppSelector } from "@/store"
+import { useIsFocused, useNavigationState } from "@react-navigation/native"
 import { isToday, parseISO } from "date-fns"
+import { memo } from "react"
+import { shallowEqual } from "react-redux"
 
 const NORTH_PROVINCES = [
   {
@@ -22,16 +25,20 @@ const NORTH_PROVINCES = [
   },]
 
 
-export const NorthResult = () => {
+export const NorthResult = memo(() => {
 
-  const status = useAppSelector((state) => state.timeDraw.regions["north"])
-  const dateSelected = useAppSelector((state) => state.timeDraw.dateSelected);
+  const { type } = useAppSelector(
+    (state) => ({ type: state.timeDraw.regions["north"].type }),
+    shallowEqual
+  )
+  const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
 
   const isSelectedToday = isToday(parseISO(dateSelected));
 
-  const isUpcoming = status.type === "UPCOMING" && isSelectedToday
-  const isLive = status.type === "LIVE"
-  const isFinished = status.type === "FINISHED"
+  const isUpcoming = type === "UPCOMING" && isSelectedToday
+  const isLive = type === "LIVE"
+  const isFinished = type === "FINISHED"
+
 
   return <>
     <Screen
@@ -42,8 +49,8 @@ export const NorthResult = () => {
       {
         isUpcoming ?
           <CountDownDraw regionName="XỔ SỐ MIỀN BẮC" region="north" />
-          : <LotteryResultTable provinces={NORTH_PROVINCES} region="north" />
+          : <LotteryResultTable region="north" />
       }
     </Screen>
   </>
-}
+});

@@ -11,7 +11,7 @@ export const DEFAULT_API_CONFIG: ApiConfig = {
   timeout: 10000,
 }
 
-console.log(DEFAULT_API_CONFIG)
+
 export class Api {
   apisauce: ApisauceInstance
   config: ApiConfig
@@ -105,6 +105,17 @@ export class Api {
       if (problem) return problem
     }
 
+    return { kind: "ok", data: response.data }
+  }
+
+  async getLotteryResults(date: string, region: string, station: string): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
+    const response: ApiResponse<any> = await this.apisauce.get("/lottery-results", { date, region, station })
+
+    if (!response.ok) {
+      const problem = getGeneralApiProblem(response)
+      if (problem) return problem
+
+    }
     return { kind: "ok", data: response.data }
   }
 }

@@ -39,8 +39,6 @@ export function MainNavigator() {
   const dispatch = useAppDispatch()
 
   useEffect(() => {
-    // Chạy ngay lập tức khi app load
-    dispatch(tick())
 
     // Thiết lập đếm nhịp mỗi giây
     const timer = setInterval(() => {

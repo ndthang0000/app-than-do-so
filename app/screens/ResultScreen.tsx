@@ -15,7 +15,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { addDays, format, isAfter, isToday, parseISO, startOfDay } from "date-fns";
 import Toast from "react-native-toast-message";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { setDateSelected } from "@/store/slices/timeDrawSlice";
+import { setDateSelected } from "@/store/slices/lotterySlice";
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
   // how to get params from _props.route.params
@@ -25,7 +25,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   const dispatch = useAppDispatch()
 
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
-  const dateSelected = useAppSelector((state) => state.timeDraw.dateSelected);
+  const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
 
 
   // Kiểm tra xem ngày đang chọn có phải hôm nay không để chặn nút Next
@@ -65,7 +65,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
     // Tên thứ trong tiếng Việt (Cần điều chỉnh nếu bạn muốn locale hoàn chỉnh)
     const days = ["CN", "THỨ 2", "THỨ 3", "THỨ 4", "THỨ 5", "THỨ 6", "THỨ 7"];
     const dayName = days[date.getDay()];
-    const formattedDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+    const formattedDate = `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
 
     // check the dateString is today or yesterday
     let secondaryTitle = '';
