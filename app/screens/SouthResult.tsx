@@ -49,7 +49,7 @@ export const SouthResult = () => {
   const isSelectedToday = isToday(parseISO(dateSelected));
 
   const isUpcoming = type === "UPCOMING" && isSelectedToday
-  const isLive = type === "LIVE"
+  const isLive = type === "LIVE" && isSelectedToday
   const isFinished = type === "FINISHED"
 
 
@@ -62,7 +62,7 @@ export const SouthResult = () => {
       {
         isUpcoming ?
           <CountDownDraw regionName="XỔ SỐ MIỀN NAM" region="south" />
-          : <LotteryResultTable region="south" />
+          : <LotteryResultTable region="south" isLive={isLive} />
       }
     </Screen>
   </>

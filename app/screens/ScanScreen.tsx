@@ -395,7 +395,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     statsRef.current = createDefaultStats(); // Reset kho dữ liệu
   };
 
-  if (!hasPermission || !device) {
+  if (!device) {
     return (
       <Screen style={themed($container)} safeAreaEdges={['top']}>
         <Text text="Đang tải Camera..." />

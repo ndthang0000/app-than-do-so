@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit"
 import { api } from "@/services/api"
-import { GeneralApiProblem } from "@/services/api/apiProblem"
+import { parse, format } from 'date-fns';
 
 // Kiểu dữ liệu cho từng đài xổ số
 export interface LotteryResult {
@@ -20,19 +20,47 @@ interface LotteryState {
   results: Record<string, LotteryResult[]>
   loading: boolean
   error: string | null,
-  dateSelected: string,
+  dateSelected: string, // DD-MM-YYYY
+  recentlyAdded: string[] // <--- Thêm cái này để quản lý highlight 15s
 }
 
 const initialState: LotteryState = {
   results: {},
   loading: false,
   error: null,
-  dateSelected: new Date().toISOString().split("T")[0],
+  dateSelected: new Date().toISOString().split("T")[0], // DD-MM-YYYY mặc định là TODAY
+  recentlyAdded: [], // <--- Khởi tạo mảng rỗng
 }
 
 /**
  * Thunk: Lấy kết quả xổ số từ API
  */
+// Helper: Tái sử dụng logic tính toán Loto
+const processSingleProvinceLoto = (p: any) => {
+  const province = { ...p, loto: {} as Record<string, string[]> }
+  if (!province.prizes) return province
+  const lotoSet = new Set<string>()
+
+  Object.values(province.prizes).forEach((nums) => {
+    if (Array.isArray(nums)) {
+      nums.forEach((num) => {
+        if (typeof num === "string" && num.length >= 2 && num !== "*" && num !== "-") {
+          lotoSet.add(num.slice(-2))
+        }
+      })
+    }
+  })
+
+  const sortedLoto = Array.from(lotoSet).sort()
+  sortedLoto.forEach((num) => {
+    const head = num.charAt(0)
+    const tail = num.charAt(1)
+    if (!province.loto[head]) province.loto[head] = []
+    province.loto[head].push(tail)
+  })
+  return province
+}
+
 export const fetchLotteryResults = createAsyncThunk(
   "lottery/fetchResults",
   async (params: { date: string; region: string; station?: string }, { rejectWithValue }) => {
@@ -63,6 +91,46 @@ export const lotterySlice = createSlice({
     },
     setDateSelected: (state, action: { payload: string }) => {
       state.dateSelected = action.payload
+    },
+    updateLotteryFromSocket: (state, action: PayloadAction<{
+      region: string,
+      date: string,
+      station: string,
+      prizes: any,
+      changes: any[]
+    }>) => {
+      const { region, date, station, prizes, changes } = action.payload
+      const parsedDate = parse(date, 'dd-MM-yyyy', new Date());
+      const outputDateString = format(parsedDate, 'yyyy-MM-dd');
+
+      const key = `${region}_${outputDateString}`
+      if (!state.results[key]) return
+      // 1. Tìm index của đài (station) cần cập nhật trong mảng kết quả
+      const stationIndex = state.results[key].findIndex(p => p.station === station)
+
+      if (stationIndex !== -1) {
+        const province = state.results[key][stationIndex]
+
+        // 2. Cập nhật dữ liệu mới và tính lại Loto cho đài này
+        const updatedProvince = processSingleProvinceLoto({
+          ...province,
+          prizes: prizes,
+          isLive: true
+        })
+
+        state.results[key][stationIndex] = updatedProvince
+        // 3. Xử lý highlight (NEW)
+        // Dựa vào payload: c.rank chính là prizeKey (G1, G2...)
+        const newIds = changes.map(c => `${station}-${c.rank}-${c.index}`)
+
+        // Thêm vào danh sách highlight, dùng Set để tránh trùng lặp
+        state.recentlyAdded = [...new Set([...state.recentlyAdded, ...newIds])]
+      }
+    },
+
+    // Xóa trạng thái highlight sau 15s
+    clearNewStatus: (state, action: PayloadAction<string[]>) => {
+      state.recentlyAdded = state.recentlyAdded.filter(id => !action.payload.includes(id))
     }
   },
   extraReducers: (builder) => {
@@ -79,42 +147,7 @@ export const lotterySlice = createSlice({
         // Kiểm tra nếu không có kết quả thì dừng
         if (!data?.result) return
 
-        // 1. Tính toán sẵn loto cho từng tỉnh/đài
-        const processedResults = data.result.map((p: any) => {
-          // Tạo bản sao để tránh làm hỏng dữ liệu gốc (tốt cho tính bất biến)
-          const province = { ...p, loto: {} as Record<string, string[]> }
-
-          if (!province.prizes) return province
-
-          const lotoSet = new Set<string>()
-
-          // 2. Lấy 2 số cuối từ các giải (bỏ qua specialCode vì nó không phải Array)
-          Object.values(province.prizes).forEach((nums) => {
-            if (Array.isArray(nums)) {
-              nums.forEach((num) => {
-                if (typeof num === "string" && num.length >= 2 && num !== "*") {
-                  lotoSet.add(num.slice(-2))
-                }
-              })
-            }
-          })
-
-          // 3. Phân loại theo Đầu - Đuôi
-          const sortedLoto = Array.from(lotoSet).sort()
-          sortedLoto.forEach((num) => {
-            const head = num.charAt(0)
-            const tail = num.charAt(1)
-            if (!province.loto[head]) {
-              province.loto[head] = []
-            }
-            province.loto[head].push(tail)
-          })
-
-          return province
-        })
-
-        // 4. Lưu vào Store
-        state.results[key] = processedResults
+        state.results[key] = data.result.map((p: any) => processSingleProvinceLoto(p))
       })
       .addCase(fetchLotteryResults.rejected, (state, action) => {
         state.loading = false
@@ -123,7 +156,7 @@ export const lotterySlice = createSlice({
   },
 })
 
-export const { clearOldResults, setDateSelected } = lotterySlice.actions
+export const { clearOldResults, setDateSelected, updateLotteryFromSocket, clearNewStatus } = lotterySlice.actions
 export default lotterySlice.reducer
 
 import { RootState } from "@/store" // Đảm bảo bạn đã export RootState từ store/index.ts
@@ -133,13 +166,13 @@ export const selectLotteryResults = (state: RootState, region: string, date: str
   return state.lottery.results[key]
 }
 
-export const fetchLotteryIfNeeded = (params: { date: string; region: string; station?: string }) =>
+export const fetchLotteryIfNeeded = (params: { date: string; region: string; station?: string, noCache?: boolean }) =>
   async (dispatch: any, getState: any) => {
     const state = getState() as RootState
     const key = `${params.region}_${params.date}`
     const cached = state.lottery.results[key]
 
-    if (!cached) {
+    if (!cached || params.noCache) {
       return dispatch(fetchLotteryResults(params))
     }
 

@@ -12,5 +12,5 @@
 // Nếu dùng thiết bị thật (thay bằng IP máy bạn)
 // API_URL=http://192.168.1.16:3425
 export default {
-  API_URL: "http://10.0.2.2:3425/api",
+  API_URL: "http://10.0.2.2:3425",
 }

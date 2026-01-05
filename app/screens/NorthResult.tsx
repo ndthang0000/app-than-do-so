@@ -36,7 +36,7 @@ export const NorthResult = memo(() => {
   const isSelectedToday = isToday(parseISO(dateSelected));
 
   const isUpcoming = type === "UPCOMING" && isSelectedToday
-  const isLive = type === "LIVE"
+  const isLive = type === "LIVE" && isSelectedToday
   const isFinished = type === "FINISHED"
 
 
@@ -49,7 +49,7 @@ export const NorthResult = memo(() => {
       {
         isUpcoming ?
           <CountDownDraw regionName="XỔ SỐ MIỀN BẮC" region="north" />
-          : <LotteryResultTable region="north" />
+          : <LotteryResultTable region="north" isLive={isLive} />
       }
     </Screen>
   </>

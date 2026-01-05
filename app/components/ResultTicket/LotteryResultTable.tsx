@@ -9,14 +9,16 @@ import { LotoTable } from "./LotoTable"
 import { Region } from "@/constants/lotteryTicket"
 import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
 import { useAppDispatch, useAppSelector } from "@/store"
-import { fetchLotteryIfNeeded } from "@/store/slices/lotterySlice"
+import { clearNewStatus, fetchLotteryIfNeeded, updateLotteryFromSocket } from "@/store/slices/lotterySlice"
 import { useIsFocused } from "@react-navigation/native"
 import { HeaderRowNorth } from "./HeaderRowNorth"
+import { socket } from "@/services/socket/socket"
 
 export type DisplayMode = "full" | "last2" | "last3"
 
 type Props = {
-  region: Region
+  region: Region,
+  isLive: boolean
 }
 
 const PRIZES: PrizeKey[] = [
@@ -28,7 +30,7 @@ const PRIZES_NORTH: PrizeKey[] = [
 ]
 
 
-export function LotteryResultTable({ region }: Props) {
+export function LotteryResultTable({ region, isLive }: Props) {
 
   const $containerInsets = useSafeAreaInsetsStyle(["bottom"])
   const { themed, theme: { colors } } = useAppTheme();
@@ -46,7 +48,6 @@ export function LotteryResultTable({ region }: Props) {
 
   const choosePrizes = region === "north" ? PRIZES_NORTH : PRIZES;
 
-
   useEffect(() => {
     // Mỗi khi dateSelected hoặc region thay đổi, hàm này sẽ tự kiểm tra cache
     if (!isFocused) return;
@@ -54,8 +55,52 @@ export function LotteryResultTable({ region }: Props) {
     dispatch(fetchLotteryIfNeeded({
       date: dateSelected,
       region: region,
+      noCache: isLive && isFocused, // Nếu đang ở chế độ
     }))
+
   }, [dateSelected, dispatch, isFocused])
+
+  useEffect(() => {
+    // 1. Kết nối
+    if (!isLive) return;
+    socket.connect();
+
+    socket.on('connect', () => {
+      console.log('Connected to Socket Server');
+      // 2. Tham gia vào room của miền tương ứng
+      socket.emit('joinRegion', region);
+    });
+
+    // 3. Lắng nghe dữ liệu cập nhật
+    socket.on('onLotteryChange', (payload) => {
+      // Giả sử payload server trả về có: fullData (mảng result), changes (mảng các ô vừa nhảy số)
+      if (payload) {
+        dispatch(updateLotteryFromSocket(payload))
+
+        // Xử lý xóa highlight sau 15 giây cho chính các giải vừa nhảy
+        if (payload.changes && payload.changes.length > 0) {
+          const idsToRemove = payload.changes.map((c: any) => `${payload.station}-${c.rank}-${c.index}`)
+          console.log(idsToRemove)
+          setTimeout(() => {
+            dispatch(clearNewStatus(idsToRemove))
+          }, 5000) // 15 giây "Wow" cho người dùng
+        }
+      }
+    })
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected');
+    });
+
+    // Cleanup khi component unmount
+    return () => {
+      if (!isLive) return;
+      socket.off('connect');
+      socket.off('onLotteryChange');
+      socket.disconnect();
+    };
+  }, [isLive]);
+
 
   return (
     <View style={[themed($tableWrapper), $containerInsets]}>
@@ -65,7 +110,16 @@ export function LotteryResultTable({ region }: Props) {
 
         {
           choosePrizes.map((prize, index) => (
-            <ResultRow prize={prize} provinces={provinces} key={index} index={index} flex={calculateFlex} region={region} displayMode={displayMode} />
+            <ResultRow
+              prize={prize}
+              provinces={provinces}
+              key={index}
+              index={index}
+              flex={calculateFlex}
+              region={region}
+              displayMode={displayMode}
+              isLive={isLive}
+            />
           ))
         }
       </View>
@@ -76,5 +130,5 @@ export function LotteryResultTable({ region }: Props) {
 }
 
 const $tableWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  padding: spacing.sm,
+  // padding: spacing.sm,
 })

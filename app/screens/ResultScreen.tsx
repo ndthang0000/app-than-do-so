@@ -101,14 +101,14 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   const SettingPressableIcon = () => {
     return (
       <TouchableOpacity onPress={() => console.log('navigate to settings')} activeOpacity={0.5}>
-        <IconSetting width={24} height={24} />
+        <IconSetting width={22} height={22} />
       </TouchableOpacity>
     )
   }
 
   const BackIcon = () => (
     <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
-      <IconBack width={22} height={22} color={colors.text} />
+      <IconBack width={20} height={20} color={colors.text} />
     </TouchableOpacity>
   );
 
@@ -122,6 +122,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
         backgroundColor={colors.background}
         containerStyle={{ paddingHorizontal: spacing.md, backgroundColor: colors.surface }}
         titleStyle={{ color: colors.text, fontWeight: "bold", fontSize: 20 }}
+        style={{ height: 48 }}
       />
       <View style={themed($dateWrapper)}>
         <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handlePrevious}>
@@ -152,9 +153,6 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
             onPress={() => setIsCalendarVisible(false)} // Bấm ngoài Modal để đóng
           >
             <View style={themed($modalContent)}>
-              {/* Truyền hàm handleDateSelect vào DatePicker
-                            để nó có thể cập nhật và đóng Modal 
-                        */}
               <DatePicker
                 onDateSelect={handleDateSelect}
                 initialDate={dateSelected}

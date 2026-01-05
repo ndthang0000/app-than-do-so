@@ -77,7 +77,7 @@ export const CentraResult = () => {
       {
         isUpcoming ?
           <CountDownDraw regionName="XỔ SỐ MIỀN TRUNG" region="central" />
-          : <LotteryResultTable region="central" />
+          : <LotteryResultTable region="central" isLive={isLive} />
       }
     </Screen>
   </>

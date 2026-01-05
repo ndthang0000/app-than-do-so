@@ -38,13 +38,15 @@ export function HeaderRow({ provinces, flex }: Props) {
   )
 }
 
+const paddingVerticalHeader = 10
+
 const $cellPricingWrapper: ThemedStyle<ViewStyle> = ({ colors }) => ({
   // borderRightWidth: 1,
   // borderColor: colors.separator,
   justifyContent: "center",
   alignItems: "center",
   flex: 1,
-  paddingVertical: 6,
+  paddingVertical: paddingVerticalHeader,
   borderRightWidth: 1,
   borderColor: colors.separator,
   borderStyle: "dashed",
@@ -55,7 +57,7 @@ const $cellWrapper: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   // borderColor: colors.separator,
   justifyContent: "center",
   alignItems: "center",
-  paddingVertical: spacing.md,
+  paddingVertical: paddingVerticalHeader,
 
 })
 

@@ -7,7 +7,7 @@ import axios from "axios"
 import { loginByDevice, logout, setAuthToken } from "@/store/slices/authSlice"
 
 export const DEFAULT_API_CONFIG: ApiConfig = {
-  url: Config.API_URL,
+  url: Config.API_URL + '/api',
   timeout: 10000,
 }
 
@@ -57,7 +57,7 @@ export class Api {
             const refreshToken = store.getState().auth.refreshToken
             const deviceId = store.getState().auth.deviceId // Lấy từ store của bạn
 
-            const res = await axios.post(`${this.config.url}/auth/refresh`, {
+            const res = await axios.post(`${this.config.url}/auth/refresh-token`, {
               refreshToken,
               deviceId
             })

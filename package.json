@@ -84,7 +84,8 @@
     "react-native-worklets-core": "^1.6.2",
     "react-redux": "^9.2.0",
     "redux-persist": "^6.0.0",
-    "setimmediate": "^1.0.5"
+    "setimmediate": "^1.0.5",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

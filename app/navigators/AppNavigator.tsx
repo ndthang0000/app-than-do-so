@@ -44,6 +44,7 @@ const AppStack = () => {
 
   // Logic kiểm tra: Nếu có authToken thì coi như đã login
   const token = useAppSelector((state) => state.auth.authToken)
+  console.log(token)
   const isAuthenticated = !!token
 
   // Quan trọng: Nếu chưa nạp xong dữ liệu từ MMKV, 

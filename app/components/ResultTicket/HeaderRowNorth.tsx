@@ -15,7 +15,12 @@ export function HeaderRowNorth({ provinces }: Props) {
 
   return (
     <View style={themed($wrapper)}>
-      <Text text={headerText} style={themed($headerText)} />
+      <Text
+        text={headerText}
+        style={themed($headerText)}
+        numberOfLines={1}
+        adjustsFontSizeToFit={true}
+      />
     </View>
   )
 }
