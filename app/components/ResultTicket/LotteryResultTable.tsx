@@ -1,10 +1,10 @@
-import { View, ViewStyle } from "react-native"
-import { HeaderRow, PrizeKey, ProvinceResult } from "./HeaderRow"
+import { TouchableOpacity, View, ViewStyle } from "react-native"
+import { HeaderRow, PrizeKey } from "./HeaderRow"
 import { ResultRow } from "./ResultRow"
 import { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { LotoTable } from "./LotoTable"
 import { Region } from "@/constants/lotteryTicket"
 import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
@@ -13,6 +13,10 @@ import { clearNewStatus, fetchLotteryIfNeeded, updateLotteryFromSocket } from "@
 import { useIsFocused } from "@react-navigation/native"
 import { HeaderRowNorth } from "./HeaderRowNorth"
 import { socket } from "@/services/socket/socket"
+import Sound from 'react-native-sound';
+import { Text } from "../Text"
+import { speakLotteryResult } from "@/utils/speech"
+Sound.setCategory('Playback');
 
 export type DisplayMode = "full" | "last2" | "last3"
 
@@ -39,6 +43,9 @@ export function LotteryResultTable({ region, isLive }: Props) {
   const isFocused = useIsFocused()
   const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
   const provinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || [];
+  const rollingSoundRef = useRef<Sound | null>(null);
+  const newSoundRef = useRef<Sound | null>(null);
+  const [isSoundReady, setIsSoundReady] = useState(false);
 
   const handleChangeDisplayMode = (mode: DisplayMode) => {
     setDisplayMode(mode)
@@ -47,6 +54,26 @@ export function LotteryResultTable({ region, isLive }: Props) {
   const calculateFlex = provinces.length == 3 ? 2 : (provinces.length == 1 ? 5 : 3);
 
   const choosePrizes = region === "north" ? PRIZES_NORTH : PRIZES;
+
+  // Hàm trả lại âm lượng cũ
+  const restoreVolume = () => {
+    rollingSoundRef.current?.setVolume(0.5); // Trả về mức default 0.5
+  };
+
+  const playNewSoundWithDucking = (station: string, rank: string, value: string) => {
+    // 1. Giảm âm lượng nhạc nền xuống mức nhỏ để nghe tiếng chuông rõ hơn
+    rollingSoundRef.current?.setVolume(0.1);
+
+    if (newSoundRef.current) {
+      newSoundRef.current.play((success) => {
+        // 2. Sau khi tiếng chuông dứt, bắt đầu gọi TTS
+        speakLotteryResult(station, rank, value, restoreVolume);
+      });
+    } else {
+      // Nếu không có file chuông, vẫn gọi TTS
+      speakLotteryResult(station, rank, value, restoreVolume);
+    }
+  };
 
   useEffect(() => {
     // Mỗi khi dateSelected hoặc region thay đổi, hàm này sẽ tự kiểm tra cache
@@ -79,11 +106,18 @@ export function LotteryResultTable({ region, isLive }: Props) {
 
         // Xử lý xóa highlight sau 15 giây cho chính các giải vừa nhảy
         if (payload.changes && payload.changes.length > 0) {
+          const newNumbers = payload.changes.filter((c: any) => c.value !== '*' && c.value !== '-');
+
+          if (newNumbers.length > 0) {
+            // Chỉ lấy số đầu tiên về để đọc (tránh đọc dồn dập khi về nhiều số cùng lúc)
+            const target = newNumbers[0];
+            playNewSoundWithDucking(payload.station, target.rank, target.value);
+          }
           const idsToRemove = payload.changes.map((c: any) => `${payload.station}-${c.rank}-${c.index}`)
-          console.log(idsToRemove)
+
           setTimeout(() => {
             dispatch(clearNewStatus(idsToRemove))
-          }, 5000) // 15 giây "Wow" cho người dùng
+          }, 10000) // 15 giây "Wow" cho người dùng
         }
       }
     })
@@ -101,6 +135,66 @@ export function LotteryResultTable({ region, isLive }: Props) {
     };
   }, [isLive]);
 
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    const startSound = () => {
+      if (isLive && isSoundReady && rollingSoundRef.current && isFocused) {
+        // Đảm bảo volume mức cao
+        rollingSoundRef.current.setVolume(0.5);
+
+        rollingSoundRef.current.play((success) => {
+          if (!success) {
+            // Nếu fail, thử lại 1 lần nữa sau 1 giây
+            timer = setTimeout(() => rollingSoundRef.current?.play(), 2000);
+          }
+        });
+      } else {
+        rollingSoundRef.current?.pause();
+      }
+    };
+
+    // Delay 500ms để tránh xung đột lúc vừa mount màn hình
+    timer = setTimeout(startSound, 500);
+
+    return () => {
+      clearTimeout(timer);
+      rollingSoundRef.current?.pause();
+    };
+  }, [isLive, isSoundReady, isFocused]); // Lắng nghe cả isReady (state báo load xong nhạc)
+
+  useEffect(() => {
+    // KHỞI TẠO
+    const sound = new Sound('longcau.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Lỗi load nhạc:', error);
+      } else {
+        console.log('Load nhạc thành công', region);
+        sound.setNumberOfLoops(-1); // Lặp vô hạn
+        sound.setVolume(0.5);
+        rollingSoundRef.current = sound;
+        setIsSoundReady(true); // Đánh dấu đã sẵn sàng
+      }
+    });
+
+    const newSound = new Sound('bell_sound.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Lỗi load nhạc: bell_sound.mp3', error);
+      }
+      else {
+        newSoundRef.current = newSound;
+      }
+    })
+    // CLEANUP: Giải phóng khi thoát màn hình hoặc unmount
+    return () => {
+      if (rollingSoundRef.current) {
+        rollingSoundRef.current.stop();
+        rollingSoundRef.current.release();
+        rollingSoundRef.current = null;
+      }
+    };
+  }, []); // Chạy 1 lần duy nhất khi Mount
 
   return (
     <View style={[themed($tableWrapper), $containerInsets]}>
@@ -125,6 +219,7 @@ export function LotteryResultTable({ region, isLive }: Props) {
       </View>
       <DisplayModeToggleV2 value={displayMode} onChange={handleChangeDisplayMode} />
       <LotoTable provinces={provinces} region={region} />
+      <TouchableOpacity onPress={() => rollingSoundRef.current?.play()}><Text text="Phát nhát" /></TouchableOpacity>
     </View>
   )
 }
