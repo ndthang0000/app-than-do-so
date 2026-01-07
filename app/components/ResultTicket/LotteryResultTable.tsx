@@ -6,7 +6,7 @@ import { useAppTheme } from "@/theme/context"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import { useEffect, useRef, useState } from "react"
 import { LotoTable } from "./LotoTable"
-import { Region } from "@/constants/lotteryTicket"
+import { createDefaultLotteryData, Region } from "@/constants/lotteryTicket"
 import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
 import { useAppDispatch, useAppSelector } from "@/store"
 import { clearNewStatus, fetchLotteryIfNeeded, updateLotteryFromSocket } from "@/store/slices/lotterySlice"
@@ -42,7 +42,7 @@ export function LotteryResultTable({ region, isLive }: Props) {
   const dispatch = useAppDispatch()
   const isFocused = useIsFocused()
   const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
-  const provinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || [];
+  const provinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || createDefaultLotteryData(region, dateSelected);
   const rollingSoundRef = useRef<Sound | null>(null);
   const newSoundRef = useRef<Sound | null>(null);
   const [isSoundReady, setIsSoundReady] = useState(false);

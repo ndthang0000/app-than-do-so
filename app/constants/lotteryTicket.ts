@@ -1,4 +1,6 @@
 import { PrizeKey } from "@/components/ResultTicket/HeaderRow";
+import { getDay, parse } from "date-fns";
+import { LOTTERY_SCHEDULE } from "./lotterySchedule";
 
 export type Region = "north" | "central" | "south"
 export type Weekday =
@@ -98,3 +100,47 @@ export const BALL_COLORS = [
   "#AF52DE", // Tím đậm
   "#00CCCC", // Xanh Teal
 ];
+
+const defaultLotteryData =
+{
+  _id: '1',
+  date: '',
+  region: '',
+  station: '',
+  prizes: {
+    specialCode: '',
+    DB: [''],
+    G1: [''],
+    G2: [''],
+    G3: ['', ''],
+    G4: [
+      '', '',
+      '', '',
+      '', '',
+      ''
+    ],
+    G5: [''],
+    G6: ['', '', ''],
+    G7: [''],
+    G8: ['']
+  },
+}
+
+export const createDefaultLotteryData = (region: Region, date: string) => {
+  // tìm thứ 
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayOfWeek = days[getDay(parse(date, 'yyyy-MM-dd', new Date()))];
+  const station = LOTTERY_SCHEDULE.find(r => r.region === region)?.schedule.find(s => s.date === dayOfWeek) || { provinces: [] };
+  const defaultData = [];
+
+  for (let i = 0; i < station.provinces.length; i++) {
+    defaultData.push({
+      ...defaultLotteryData,
+      _id: `${i + 1}`,
+      date,
+      region,
+      station: station.provinces[i],
+    });
+  }
+  return defaultData;
+}

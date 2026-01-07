@@ -25,13 +25,8 @@ export const findStationWithLevenshtein = (lines: string[], dateStr?: string): s
   if (!dateStr) return undefined;
 
   // 1. Parse ngày để lấy danh sách đài mở thưởng hôm đó (Giữ nguyên logic cũ của bạn)
-  const normalizedDate = dateStr.replace(/[-.]/g, '/');
-  const formats = ['dd/MM/yyyy', 'dd/M/yyyy'];
-  let parsedDate: Date | null = null;
-  for (const fmt of formats) {
-    const temp = parse(normalizedDate, fmt, new Date());
-    if (isValid(temp)) { parsedDate = temp; break; }
-  }
+  let parsedDate: Date | null = parse(dateStr, 'dd-MM-yyyy', new Date());
+
   if (!parsedDate) return undefined;
 
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
