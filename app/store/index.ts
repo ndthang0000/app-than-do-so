@@ -5,6 +5,7 @@ import { timeDrawSlice } from "./slices/timeDrawSlice"
 import { authSlice } from "./slices/authSlice"
 import { lotterySlice } from "./slices/lotterySlice"
 import { reduxStorage } from "@/utils/storage"
+import { ticketSlice } from "./slices/ticketSlice"
 
 const authPersistConfig = {
   key: "auth",
@@ -16,6 +17,7 @@ const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authSlice.reducer),
   timeDraw: timeDrawSlice.reducer,
   lottery: lotterySlice.reducer,
+  ticket: ticketSlice.reducer,
   // các reducer khác không cần persist thì để bình thường
 })
 

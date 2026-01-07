@@ -118,6 +118,17 @@ export class Api {
     }
     return { kind: "ok", data: response.data }
   }
+
+  async getMyTickets(params: any): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
+    const response: ApiResponse<any> = await this.apisauce.get("/tickets/paginate", params)
+
+    if (!response.ok) {
+      const problem = getGeneralApiProblem(response)
+      if (problem) return problem
+
+    }
+    return { kind: "ok", data: response.data }
+  }
 }
 
 export const api = new Api()

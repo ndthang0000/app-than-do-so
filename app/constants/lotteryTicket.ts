@@ -1,7 +1,9 @@
-import { PrizeKey } from "@/components/ResultTicket/HeaderRow";
 import { getDay, parse } from "date-fns";
 import { LOTTERY_SCHEDULE } from "./lotterySchedule";
 
+export type PrizeKey =
+  | "G8" | "G7" | "G6" | "G5"
+  | "G4" | "G3" | "G2" | "G1" | "DB"
 export type Region = "north" | "central" | "south"
 export type Weekday =
   | "sunday"

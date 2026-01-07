@@ -3,10 +3,7 @@ import { TextStyle, View, ViewStyle } from "react-native";
 import { Text } from "../Text";
 import { ThemedStyle } from "@/theme/types";
 import { LotteryResult } from "@/store/slices/lotterySlice";
-
-export type PrizeKey =
-  | "G8" | "G7" | "G6" | "G5"
-  | "G4" | "G3" | "G2" | "G1" | "DB"
+import { PrizeKey } from "@/constants/lotteryTicket";
 
 
 export type ProvinceResult = {

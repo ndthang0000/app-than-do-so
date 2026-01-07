@@ -1,287 +1,234 @@
-// Update MyTicketScreen.tsx
-import React, { useState } from 'react';
-import { View, ViewStyle, TouchableOpacity, ScrollView, TextStyle } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { View, ViewStyle, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, TextStyle, StyleSheet } from 'react-native';
 import { useAppTheme } from '@/theme/context';
-import type { ThemedStyle } from '@/theme/types';
-import { HomeTabScreenProps } from '@/navigators/navigationTypes';
-import { Screen } from '@/components/Screen';
-import { Text } from "@/components/Text"
+import { useAppDispatch, useAppSelector } from '@/store';
+import { fetchTickets, setFilters, setPage, WinStatus } from '@/store/slices/ticketSlice';
+import { Text } from "@/components/Text";
 import { Header } from '@/components/Header';
-
-// Import Icons
 import IconBack from "@assets/svg/arrow-left.svg";
-import IconTicket from "@assets/svg/my-ticket.svg"; // Icon vé chung
-import IconSort from "@assets/svg/sort.svg"; // Giả định icon sắp xếp
-import IconSad from "@assets/svg/sad-face.svg"; // Icon mặt buồn
-import IconTrophy from "@assets/svg/trophy.svg"; // Icon cúp (cho thẻ vàng)
-import LoadingIcon from '@/components/LoadingIcon';
+import IconSort from "@assets/svg/sort.svg";
+import IconCheck from "@assets/svg/check.svg";
+import { ThemedStyle } from '@/theme/types';
+import { TicketItem } from '@/components/Ticket/TicketItem';
+import { Region } from '@/constants/lotteryTicket';
+import { HomeTabScreenProps } from '@/navigators/navigationTypes';
+import IconSad from "@assets/svg/sad-face.svg";
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 
-// Dữ liệu mẫu khớp với hình ảnh mới
-const statusFilters = ['Tất cả', 'Chưa quay', 'Đã quay', 'Trúng thưởng'];
-const regionFilters = ['Tất cả', 'Miền Bắc', 'Miền Trung', 'Miền Nam'];
+// Mapping label sang value API
+const STATUS_MAP: Record<string, WinStatus | undefined> = {
+  'Tất cả': undefined,
+  'Trúng thưởng': 'WIN',
+  'Chưa quay': 'PENDING',
+  'Không trúng': 'LOSE',
+};
 
-const ticketHistoryData = [
-  {
-    id: 1,
-    region: 'Miền Nam',
-    city: 'TP. Hồ Chí Minh',
-    status: 'TRÚNG THƯỞNG',
-    code: '928374',
-    date: '24/10/2023',
-    time: '18:30',
-    prizeName: 'Giải Đặc Biệt',
-    type: 'win'
-  },
-  {
-    id: 2,
-    region: 'Miền Trung',
-    city: 'Đà Nẵng',
-    status: 'CHƯA QUAY',
-    code: '112233',
-    time: '17:15',
-    tag: 'Hôm nay',
-    type: 'pending',
-    date: '22/10/2023',
-  },
-  {
-    id: 3,
-    region: 'Miền Bắc',
-    city: 'Hà Nội',
-    status: 'KHÔNG TRÚNG',
-    code: '654321',
-    date: '22/10/2023',
-    type: 'lost',
-    tag: 'Hôm qua',
-  },
-  {
-    id: 4,
-    region: 'Miền Trung',
-    city: 'Đà Nẵng',
-    status: 'KHÔNG TRÚNG',
-    code: '987654',
-    date: '21/10/2023',
-    type: 'lost'
-  },
-];
+const REGION_MAP: Record<string, Region | undefined> = {
+  'Tất cả': undefined,
+  'Miền Trung': 'central',
+  'Miền Nam': 'south',
+  'Miền Bắc': 'north',
+};
 
 export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function MyTicketScreen(_props) {
+  const navigation = _props.navigation;
   const { themed, theme: { colors, spacing } } = useAppTheme();
-  const [activeStatus, setActiveStatus] = useState('Tất cả');
-  const [activeRegion, setActiveRegion] = useState('Tất cả');
+  const dispatch = useAppDispatch();
 
-  // --- Components con ---
+  // Lấy dữ liệu từ Store
+  const { tickets, loading, pagination, filters } = useAppSelector(state => state.ticket);
 
+  // 1. Ref để điều khiển Bottom Sheet
+  const bottomSheetRef = useRef<BottomSheet>(null);
 
-  const SortButton = () => (
-    <TouchableOpacity style={themed($sortButton)} activeOpacity={0.7}>
-      <IconSort width={16} height={16} color={colors.text} />
-      <Text text="Sắp xếp" weight="bold" size="xs" style={{ marginLeft: spacing.xs }} />
-    </TouchableOpacity>
+  // 2. Điểm dừng (Snap points): Sheet sẽ cao 30% màn hình
+  const snapPoints = useMemo(() => ['30%'], []);
+
+  // 3. Hàm đóng/mở
+  const openSortSheet = () => bottomSheetRef.current?.expand();
+  const closeSortSheet = () => bottomSheetRef.current?.close();
+
+  // 4. Backdrop (Làm mờ nền khi hiện Sheet)
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />
+    ), []
   );
 
-  // --- Render Card ---
-  const renderTicketCard = (item: any) => {
-    // Xác định Style dựa trên loại vé
-    const isWin = item.type === 'win';
-    const isPending = item.type === 'pending';
-    const isLost = item.type === 'lost';
+  const SORT_OPTIONS = [
+    { label: 'Mới nhất', value: 'createdAt:desc' },
+    { label: 'Cũ nhất', value: 'createdAt:asc' },
+    { label: 'Trúng to nhất', value: 'weight:desc' },
+  ];
 
-    // Wrapper Style
-    const cardWrapperStyle = themed([
-      $cardBase,
-      isWin && $cardWin, // Nền vàng
-      (isPending || isLost) && $cardNormal, // Nền trắng
-      { marginBottom: spacing.md }
-    ]);
+  // Fetch dữ liệu mỗi khi filter hoặc page thay đổi
+  useEffect(() => {
+    dispatch(fetchTickets({
+      page: pagination.page,
+      limit: 10,
+      sortBy: filters.sortBy,
+      region: filters.region,
+      winStatus: filters.winStatus,
+    }));
+  }, [pagination.page, filters, dispatch]);
 
-    // Header Colors & Icons
-    let IconComponent = isWin ? IconTrophy : (isPending ? IconTicket : IconTicket); // Có thể thay icon ticket xám cho lost
-    let iconColor = isWin ? '#D97706' : (isPending ? '#3B82F6' : '#3B82F6'); // Vàng đậm / Xanh / Xám
-    let statusColor = isWin ? '#DC2626' : (isPending ? '#2563EB' : '#9CA3AF'); // Đỏ / Xanh / Xám
-    let statusBg = isWin ? 'transparent' : (isPending ? '#EFF6FF' : '#F3F4F6'); // Badge bg
-
-    // Status Icon Right
-    const StatusRight = () => {
-      if (isWin) return <Text text="🏆 TRÚNG THƯỞNG" weight="bold" size="xs" style={{ color: '#DC2626' }} />;
-      if (isPending) return (
-        <View style={themed([$badgeStatusRight, { backgroundColor: '#EFF6FF' }])}>
-          <LoadingIcon />
-          <Text text="CHƯA QUAY" weight="bold" size="xs" style={{ color: '#2563EB' }} />
-        </View>
-      );
-      if (isLost) return (
-        <View style={themed([$badgeStatusRight, { backgroundColor: colors.palette.neutral200 }])}>
-          <IconSad width={14} height={14} color="#9CA3AF" style={{ marginRight: 4 }} />
-          <Text text="KHÔNG TRÚNG" weight="bold" size="xs" style={{ color: '#9CA3AF' }} />
-        </View>
-      );
-      return null;
-    };
-
-    return (
-      <View key={item.id} style={cardWrapperStyle}>
-
-        {/* 1. Card Header */}
-        <View style={themed([$cardHeader, isWin && { borderBottomColor: 'rgba(255,255,255,0.3)' }])}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <View style={[themed($iconBox), { backgroundColor: isWin ? 'rgba(255,255,255,0.3)' : statusBg }]}>
-              <IconComponent width={20} height={20} color={isWin ? '#B45309' : iconColor} />
-            </View>
-            <View style={{ marginLeft: spacing.sm }}>
-              <Text text={item.region.toUpperCase()} size="xxs" weight="medium" style={{ color: isWin ? '#B45309' : colors.text }} />
-              <Text text={item.city} weight="bold" size="sm" style={{ color: isWin ? '#78350F' : colors.text }} />
-            </View>
-          </View>
-
-          <View style={{ alignItems: 'flex-end' }}>
-            {isWin && <View style={themed($dateBadgeWin)}><Text text={item.date} size="xxs" weight="bold" style={{ color: '#78350F' }} /></View>}
-            {(isPending || isLost) && <View style={themed($tagToday)}><Text text={item.date} size="xxs" weight="medium" /></View>}
-            {/* Trạng thái hiển thị ở dòng dưới header */}
-            {!isWin && <View style={{ marginTop: 4 }}><StatusRight /></View>}
-            {isWin && <View style={{ marginTop: 4 }}><StatusRight /></View>}
-          </View>
-        </View>
-
-        {/* 2. Body: Mã số */}
-        <View style={themed($cardBody)}>
-          <Text text="MÃ DỰ THƯỞNG" size="xxs" weight="medium" style={{ color: isWin ? '#B45309' : colors.palette.neutral500, letterSpacing: 1 }} />
-          <Text
-            text={item.code} 
-            size="xxl"
-            weight="bold"
-            style={[
-              { marginTop: spacing.xs, letterSpacing: 2 },
-              isWin && { color: '#DC2626' }, // Màu đỏ cho vé trúng
-              isPending && { color: colors.palette.accent500 },
-              isLost && { color: colors.palette.accent500, textDecorationLine: 'line-through' } // Gạch ngang cho vé thua
-            ]}
-          />
-          {/* Background trang trí chữ X mờ cho vé thua nếu cần */}
-          {isLost && <Text text="X" style={themed($watermarkLost)} />}
-        </View>
-
-        {/* 3. Footer */}
-        <View style={themed($cardFooter)}>
-          {isWin && (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text text="🕒" style={{ fontSize: 10, marginRight: 4 }} />
-                <Text text={`Dò lúc: ${item.time}`} size="xs" style={{ color: '#92400E' }} />
-              </View>
-              <Text text={item.prizeName} weight="bold" size="sm" style={{ color: '#DC2626' }} />
-            </>
-          )}
-            {isPending && (
-            <>
-              <Text text={`🕒 Giờ quay: `} size="xs" style={{ color: colors.palette.neutral500 }}>
-                <Text text={item.time} weight="bold" style={{ color: '#2563EB' }} />
-              </Text>
-              <Text text="Đang chờ..." size="xs" style={{ color: colors.palette.neutral400, fontStyle: 'italic' }} />
-            </>
-            )}
-          {isLost && (
-            <Text text="Chúc bạn may mắn lần sau!" size="xs" style={{ color: colors.palette.neutral400, fontStyle: 'italic', width: '100%' }} />
-            )}
-        </View>
-
-      </View>
-    );
+  const handleFilterStatus = (label: string) => {
+    dispatch(setFilters({ winStatus: STATUS_MAP[label] }));
   };
 
-  const BackIcon = () => (
-    <TouchableOpacity onPress={() => _props.navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
-      <IconBack width={22} height={22} color={colors.text} />
-    </TouchableOpacity>
-  );
+  const handleFilterRegion = (label: string) => {
+    dispatch(setFilters({ region: REGION_MAP[label] }));
+  };
 
   return (
     <>
       <Header
         title="LỊCH SỬ DÒ SỐ"
-        LeftActionComponent={<BackIcon />}
+        LeftActionComponent={
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+            <IconBack width={22} height={22} color={colors.text} />
+          </TouchableOpacity>
+        }
         safeAreaEdges={["top"]}
-        backgroundColor={colors.background}
-        containerStyle={{ paddingHorizontal: spacing.md, backgroundColor: colors.surface }}
-        titleStyle={{ color: colors.text, fontWeight: "bold", fontSize: 18 }}
+        containerStyle={{ backgroundColor: colors.surface }}
       />
 
-      <Screen preset="scroll" contentContainerStyle={themed($screenContainer)}>
-
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* Row 1: Status Filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={themed($filterScroll)}>
-          {statusFilters.map(status => (
-            <TouchableOpacity
-              key={status}
-              style={themed([$statusTab, activeStatus === status && $statusTabActive])}
-              onPress={() => setActiveStatus(status)}
-              >
-              <Text text={status} weight={activeStatus === status ? "bold" : "medium"} size="xs" style={{ color: activeStatus === status ? colors.surface : colors.text }} />
-              </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Row 2: Sort Button (Right Aligned) */}
-        <View style={themed($sortRow)}>
-          <SortButton />
-        </View>
-
-        {/* Row 3: Region Filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={themed($filterScroll)}>
-          {regionFilters.map(region => (
+        <View style={{ height: 40, marginTop: spacing.md }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.md, gap: spacing.xs }}>
+            {Object.keys(STATUS_MAP).map(status => {
+              const isActive = (STATUS_MAP[status] === filters.winStatus);
+              return (
                 <TouchableOpacity
-              key={region}
-              style={themed([$regionTab, activeRegion === region && $regionTabActive])}
-              onPress={() => setActiveRegion(region)}
+                  key={status}
+                  style={themed([$statusTab, isActive && $statusTabActive])}
+                  onPress={() => handleFilterStatus(status)}
                 >
-              <Text text={region} weight="medium" size="xs" style={{ color: activeRegion === region ? colors.surface : colors.palette.neutral600 }} />
+                  <Text text={status} size="xs" style={{ color: isActive ? colors.surface : colors.text }} />
                 </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Ticket List */}
-        <View style={{ marginTop: spacing.md }}>
-          {ticketHistoryData.map(renderTicketCard)}
+              );
+            })}
+          </ScrollView>
         </View>
 
-      </Screen>
+        {/* Row 2: Sort & Region */}
+        <View style={themed($sortRow)}>
+          <TouchableOpacity onPress={() => openSortSheet()} style={themed($sortButton)}>
+            <IconSort width={14} height={14} color={colors.text} />
+            <Text text=" Sắp xếp" size="xs" weight="bold" />
+          </TouchableOpacity>
+        </View>
+
+        {/* <View style={{ height: 40, marginBottom: 10 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.md, gap: spacing.xs }}>
+            {Object.keys(REGION_MAP).map(region => {
+              const isActive = (REGION_MAP[region] === filters.region);
+              return (
+                <TouchableOpacity
+                  key={region}
+                  style={themed([$regionTab, isActive && $regionTabActive])}
+                  onPress={() => handleFilterRegion(region)}
+                >
+                  <Text text={region} size="xs" style={{ color: isActive ? colors.surface : colors.palette.neutral600 }} />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View> */}
+
+        {/* Ticket List với FlatList để tối ưu hiệu năng và Loadmore */}
+        <FlatList
+          data={tickets}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => <TicketItem ticket={item} />}
+          contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={{ alignItems: 'center', marginTop: 50 }}>
+                <IconSad width={50} height={50} color={colors.palette.neutral300} />
+                <Text text="Không tìm thấy vé nào" style={{ color: colors.palette.neutral400, marginTop: 10 }} />
+              </View>
+            ) : null
+          }
+          ListFooterComponent={loading ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} /> : null}
+          onRefresh={() => dispatch(setPage(1))}
+          refreshing={loading && pagination.page === 1}
+        />
+      </View>
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1} // Mặc định là đóng
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{ backgroundColor: colors.surface }}
+        handleIndicatorStyle={{ backgroundColor: colors.palette.neutral300 }}
+      >
+        <BottomSheetView style={styles.contentContainer}>
+          <Text text="Sắp xếp theo" weight="bold" style={styles.title} />
+
+          {SORT_OPTIONS.map((option) => {
+            const isSelected = filters.sortBy === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.item, isSelected && { backgroundColor: colors.palette.neutral100 }]}
+                onPress={() => {
+                  dispatch(setFilters({ sortBy: option.value }));
+                  closeSortSheet();
+                }}
+              >
+                <Text
+                  text={option.label}
+                  style={[styles.itemText, isSelected && { color: '#DC2626', fontWeight: 'bold' }]}
+                />
+                {isSelected && <IconCheck width={18} height={18} color="#DC2626" />}
+              </TouchableOpacity>
+            );
+          })}
+        </BottomSheetView>
+      </BottomSheet>
     </>
   );
-}
-
+};
 
 // ==========================================================
-// STYLES
+// STYLES cho MyTicketScreen.tsx
 // ==========================================================
-
-const $screenContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  paddingHorizontal: spacing.md,
-  paddingTop: spacing.md,
-  paddingBottom: spacing.xxl,
-});
-
-// --- Filters ---
-const $filterScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xxs,
-  paddingRight: spacing.md,
-});
 
 const $statusTab: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  paddingVertical: spacing.xs,
   paddingHorizontal: spacing.md,
   borderRadius: spacing.xxl,
   backgroundColor: colors.surface,
   borderWidth: 1,
   borderColor: colors.palette.neutral200,
+  alignItems: "center",
+  justifyContent: "center",
 });
 
 const $statusTabActive: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: '#DC2626', // Màu đỏ đậm như design
+  backgroundColor: '#DC2626', // Màu đỏ chủ đạo của app
   borderColor: '#DC2626',
+});
+
+const $regionTab: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  paddingHorizontal: spacing.md,
+  borderRadius: spacing.lg,
+  backgroundColor: colors.palette.neutral100,
+  marginRight: spacing.xs,
+  alignItems: "center",
+  justifyContent: "center",
+});
+
+const $regionTabActive: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: '#DC2626',
 });
 
 const $sortRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: 'row',
   justifyContent: 'flex-end',
+  paddingHorizontal: spacing.md,
   marginVertical: spacing.sm,
 });
 
@@ -291,8 +238,8 @@ const $sortButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   paddingVertical: spacing.xs,
   paddingHorizontal: spacing.sm,
   backgroundColor: colors.surface,
-  borderRadius: spacing.md,
-  // Shadow nhẹ
+  borderRadius: spacing.sm,
+  // Shadow cho nút sắp xếp
   shadowColor: "#000",
   shadowOffset: { width: 0, height: 1 },
   shadowOpacity: 0.1,
@@ -300,99 +247,41 @@ const $sortButton: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   elevation: 2,
 });
 
-const $regionTab: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  paddingVertical: spacing.xxs + 2,
-  paddingHorizontal: spacing.md,
-  borderRadius: spacing.lg,
-  backgroundColor: colors.palette.neutral200,
-});
-
-const $regionTabActive: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: '#DC2626', // Màu đỏ đồng bộ
-});
-
-// --- Cards ---
-const $cardBase: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  borderRadius: spacing.lg,
-  padding: spacing.md,
-  shadowColor: colors.palette.neutral400,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.1,
-  shadowRadius: 6,
-  elevation: 4,
-  overflow: 'hidden',
-});
-
-const $cardNormal: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.surface,
-  borderWidth: 1,
-  borderColor: colors.palette.neutral200,
-});
-
-const $cardWin: ThemedStyle<ViewStyle> = ({ }) => ({
-  backgroundColor: '#FFD700', // Vàng đậm (Gold)
-  // Nếu có LinearGradient thì dùng: ['#FFF59D', '#FBC02D']
-  borderWidth: 1,
-  borderColor: '#F59E0B',
-});
-
-const $cardHeader: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+const $badgeStatusSmall: ViewStyle = {
   flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  borderBottomWidth: 1,
-  borderBottomColor: colors.palette.neutral100,
-  paddingBottom: spacing.sm,
-  marginBottom: spacing.sm,
-});
-
-const $iconBox: ThemedStyle<ViewStyle> = ({ }) => ({
-  width: 36,
-  height: 36,
-  borderRadius: 18,
   alignItems: 'center',
-  justifyContent: 'center',
-});
-
-const $tagToday: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.palette.neutral200,
+  backgroundColor: 'rgba(0,0,0,0.03)',
   paddingHorizontal: 8,
-  paddingVertical: 2,
-  borderRadius: 10,
-  marginBottom: 4,
-});
+  paddingVertical: 4,
+  borderRadius: 12,
+};
 
-const $dateBadgeWin: ThemedStyle<ViewStyle> = ({ }) => ({
-  backgroundColor: 'rgba(255,255,255,0.5)',
-  paddingHorizontal: 8,
-  paddingVertical: 2,
-  borderRadius: 10,
-  marginBottom: 4,
-});
+// Style cho TicketItem (Nếu bạn để chung trong file hoặc dùng tham khảo)
 
-const $cardBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  alignItems: 'center',
-  paddingVertical: spacing.sm,
-  position: 'relative',
-});
 
-const $watermarkLost: ThemedStyle<TextStyle> = ({ colors }) => ({
-  position: 'absolute',
-  fontSize: 100,
-  fontWeight: '900',
-  color: colors.palette.neutral200,
-  opacity: 0.3,
-  right: -20,
-  top: -20,
-  transform: [{ rotate: '-15deg' }]
-});
 
-const $cardFooter: ThemedStyle<ViewStyle> = ({ }) => ({
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
+const styles = StyleSheet.create({
+  contentContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  title: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 16,
+    color: '#1F2937',
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  itemText: {
+    fontSize: 16,
+    color: '#4B5563',
+  },
 });
-
-const $badgeStatusRight: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  flexDirection: 'row', alignItems: 'center', backgroundColor: '#eff6ff', paddingHorizontal: 16, paddingVertical: 7, borderRadius: 16
-})

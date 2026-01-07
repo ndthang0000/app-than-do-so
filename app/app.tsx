@@ -34,6 +34,7 @@ import * as storage from "./utils/storage"
 import { Provider } from "react-redux"
 import { persistor, store } from "./store"
 import { PersistGate } from "redux-persist/lib/integration/react"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 // Web linking configuration
 const prefix = Linking.createURL("/")
@@ -94,20 +95,23 @@ export function App() {
 
   // otherwise, we're ready to render the app
   return (
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-          <KeyboardProvider>
-          <ThemeProvider >
-            <AppNavigator
-              linking={linking}
-              initialState={initialNavigationState}
-              onStateChange={onNavigationStateChange}
-            />
-            </ThemeProvider>
-          </KeyboardProvider>
-        </SafeAreaProvider>
-      </PersistGate>
-    </Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+            <KeyboardProvider>
+              <ThemeProvider >
+                <AppNavigator
+                  linking={linking}
+                  initialState={initialNavigationState}
+                  onStateChange={onNavigationStateChange}
+                />
+              </ThemeProvider>
+            </KeyboardProvider>
+          </SafeAreaProvider>
+        </PersistGate>
+      </Provider>
+    </GestureHandlerRootView>
+
   )
 }
