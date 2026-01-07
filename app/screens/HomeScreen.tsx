@@ -55,7 +55,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
         <TouchableOpacity style={themed($scanWrapper)} activeOpacity={0.7} onPress={() => navigation.navigate('Scan')}>
           <IconScan width={80} height={80} />
           <Text text='Scan ảnh vé số' weight='bold' size="lg" />
-          <Text text='Bạn sẽ nhận thông báo ngay khi có kết quả' preset='default' weight='light' style={{ textAlign: 'center' }} />
+          <Text text='Bạn sẽ nhận kết quả ngay lập tức' preset='default' weight='light' style={{ textAlign: 'center' }} />
         </TouchableOpacity>
         <View style={themed($subMenuWrapper)}>
           {dataSubMenu.map(({ icon: Icon, label, navigate }) => (

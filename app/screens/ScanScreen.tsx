@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, ViewStyle, TextStyle, TouchableOpacity, Dimensions, Animated, StyleSheet, AppState, AppStateStatus } from 'react-native';
-import { Camera, useCameraDevice, useCameraPermission, useFrameProcessor } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraFormat, useCameraPermission, useFrameProcessor } from 'react-native-vision-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppTheme } from '@/theme/context';
 import type { ThemedStyle } from '@/theme/types';
@@ -22,6 +22,7 @@ import { PhotoRecognizer, useTextRecognition } from 'react-native-vision-camera-
 import { ScanInfoOverlay } from '@/components/Scan/ScanInfoOverlay';
 import { ScanResult } from '@/constants/lotteryTicket';
 import { fastParseFrame, getMostFrequent } from '@/utils/fastParseFrame';
+import { ScanningTimer } from '@/components/Scan/ScanningTimer';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -89,6 +90,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const camera = useRef<Camera>(null);
 
   const [shouldRenderCamera, setShouldRenderCamera] = useState(false);
+  const [isPermissionGranted, setIsPermissionGranted] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScanningActive, setIsScanningActive] = useState(false);
@@ -178,9 +180,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       }
     });
 
-    if (current.code && !captureIntervalRef.current && isScanningActive && !hasFoundResult) {
-      console.log("🚀 Đã tìm thấy Code, bắt đầu chế độ chụp ảnh 0.3s/lần");
-
+    if (!captureIntervalRef.current && isScanningActive && !hasFoundResult) {
+      console.log("🚀 bắt đầu chế độ chụp ảnh 0.3s/lần");
       startAutoCapture();
     }
 
@@ -225,7 +226,10 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
   const containerRef = useRef<View>(null);
 
-
+  const format = useCameraFormat(device, [
+    { photoAspectRatio: 4 / 3 },
+    { videoAspectRatio: 4 / 3 }
+  ])
 
   const processImageForOCR = async (uri: string, photoWidth: number, photoHeight: number, shouldCrop: boolean = true) => {
     if (isProcessing) return;
@@ -234,28 +238,48 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       let finalUri = uri;
 
       if (shouldCrop) {
-        // 1. Với VisionCamera, thường ảnh 4:3 sẽ 'Cover' màn hình theo chiều Cao hoặc Rộng
-        // Tính scale để ảnh lấp đầy (Cover) màn hình
-        const scale = Math.max(screenWidth / photoWidth, screenHeight / photoHeight);
+        // 1. Tính toán kích thước ảnh hiển thị trong mode "contain"
+        const screenAspectRatio = screenWidth / screenHeight;
+        const photoAspectRatio = photoWidth / photoHeight;
 
-        // 2. Tính kích thước hiển thị thực tế của ảnh sau khi scale
-        const displayedPhotoWidth = photoWidth * scale;
-        const displayedPhotoHeight = photoHeight * scale;
+        let renderWidth, renderHeight, offsetX, offsetY;
 
-        // 3. Tính phần dư bị tràn ra ngoài màn hình (Offsets)
-        // Lưu ý: Nếu ảnh lấp đầy chiều cao, offsetY sẽ là 0.
-        const offsetX = (displayedPhotoWidth - screenWidth) / 2;
-        const offsetY = (displayedPhotoHeight - screenHeight) / 2;
+        if (photoAspectRatio > screenAspectRatio) {
+          // Ảnh bị dải đen trên/dưới
+          renderWidth = screenWidth;
+          renderHeight = screenWidth / photoAspectRatio;
+          offsetX = 0;
+          offsetY = (screenHeight - renderHeight) / 2;
+        } else {
+          // Ảnh bị dải đen trái/phải
+          renderHeight = screenHeight;
+          renderWidth = screenHeight * photoAspectRatio;
+          offsetY = 0;
+          offsetX = (screenWidth - renderWidth) / 2;
+        }
 
-        // 4. LẤY TỌA ĐỘ TƯƠNG ĐỐI
-        // Quan trọng: fY bây giờ phải là tọa độ tính từ đỉnh của Camera View
+
+        // 2. Tính Scale giữa ảnh gốc và vùng hiển thị thực tế
+        const scale = renderWidth / photoWidth;
+
+        // 3. Tọa độ khung quét trên màn hình
         const { x: fX, y: fY, width: fW, height: fH } = frameLayout.current;
 
-        // 5. Tính toán tọa độ cắt trên ảnh gốc
-        const actualOriginX = (fX + offsetX) / scale;
-        const actualOriginY = (fY + offsetY) / scale; // fY chuẩn sẽ sửa được lỗi lệch
-        const actualWidth = fW / scale;
-        const actualHeight = fH / scale;
+        // 2. TÍNH TOÁN VÙNG ĐỆM (PADDING) - Thêm 15% diện tích
+        const paddingX = fW * 0.15;
+        const paddingY = fH * 0.15;
+        // Mở rộng tọa độ nhưng đảm bảo không vượt quá biên màn hình
+        const paddedX = Math.max(offsetX, fX - paddingX);
+        const paddedY = Math.max(offsetY, fY - paddingY);
+        const paddedW = Math.min(renderWidth, fW + (paddingX * 2));
+        const paddedH = Math.min(renderHeight, fH + (paddingY * 2));
+        // 4. CHUYỂN ĐỔI TỌA ĐỘ SANG ẢNH GỐC
+        // Ta lấy tọa độ khung hình trừ đi dải đen (offset) rồi mới chia cho scale
+        // 3. CHUYỂN ĐỔI SANG TỌA ĐỘ ẢNH GỐC
+        const actualOriginX = (paddedX - offsetX) / scale;
+        const actualOriginY = (paddedY - offsetY) / scale;
+        const actualWidth = paddedW / scale;
+        const actualHeight = paddedH / scale;
 
         // console.log("DEBUG CROP:", { actualOriginY, scale, offsetY, fY });
 
@@ -374,6 +398,12 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   }
 
+  const handleTimeout = useCallback(() => {
+    stopAutoCapture();
+    setIsScanningActive(false);
+    // navigation.navigate('ScanTimeoutScreen');
+  }, [navigation]);
+
   const stopAutoCapture = () => {
     isStoppingRef.current = true; // Chặn mọi yêu cầu chụp mới ngay lập tức
     if (captureIntervalRef.current) {
@@ -395,22 +425,24 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     statsRef.current = createDefaultStats(); // Reset kho dữ liệu
   };
 
-  if (!device) {
-    return (
-      <Screen style={themed($container)} safeAreaEdges={['top']}>
-        <Text text="Đang tải Camera..." />
-      </Screen>
-    );
-  }
 
   useEffect(() => {
-    if (!hasPermission) requestPermission();
+    const checkPermission = async () => {
+      if (!hasPermission) {
+        const status = await requestPermission();
+        setIsPermissionGranted(status);
+      } else {
+        setIsPermissionGranted(true);
+      }
+    };
 
-    // Animation thanh quét
+    checkPermission();
+
+    // Animation giữ nguyên
     Animated.loop(
       Animated.sequence([
         Animated.timing(scanLineAnim, {
-          toValue: FRAME_HEIGHT - 4, // Trừ đi chiều cao của thanh quét
+          toValue: FRAME_HEIGHT - 4,
           duration: 2000,
           useNativeDriver: true,
         }),
@@ -459,6 +491,24 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     return () => stopAutoCapture();
   }, []);
 
+
+  if (!isPermissionGranted) {
+    return (
+      <View style={themed($container)}>
+        <Text text="Ứng dụng cần quyền Camera để quét vé số" />
+
+      </View>
+    );
+  }
+
+  if (!device) {
+    return (
+      <Screen style={themed($container)} safeAreaEdges={['top']}>
+        <Text text="Đang tải Camera..." />
+      </Screen>
+    );
+  }
+
   return (
     <View style={themed($container)} ref={containerRef}>
       <Camera
@@ -467,10 +517,12 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         device={device}
         isActive={shouldRenderCamera && appState === 'active'}
         frameProcessor={frameProcessor}
+        format={format}
         pixelFormat={'yuv'}
         torch={isFlashOn ? 'on' : 'off'}
-        exposure={-1}
         photo={true}
+        zoom={1}
+        resizeMode='contain'
       />
 
       <View style={themed($overlayContainer)}>
@@ -496,6 +548,16 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
           }
         />
         <ScanInfoOverlay isVisible={isScanningActive} data={scanResult} />
+
+        <ScanningTimer
+          isActive={isScanningActive}
+          maxTime={15}
+          onTimeout={handleTimeout}
+          style={themed($scanTimerWrapper)}
+        />
+
+
+
         <View style={themed($scanAreaWrapper)}>
           <View
             style={themed($scanFrame)}
@@ -580,6 +642,15 @@ const $headerTitle: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.palette.neutral100,
   fontWeight: "semibold",
   fontSize: 20
+})
+
+const $scanTimerWrapper: ThemedStyle<ViewStyle> = () => ({
+  alignItems: 'center',
+  position: 'absolute',
+  top: topDistance - 30,
+  left: screenWidth * 0.5 - 50,
+  height: 40,
+  width: 100,
 })
 
 const $scanAreaWrapper: ThemedStyle<ViewStyle> = () => ({
