@@ -30,10 +30,12 @@ export type HomeTabParamList = {
 // App Stack Navigator types
 export type AppStackParamList = {
   Welcome: undefined
+  ErrorOCR: undefined
   Main: NavigatorScreenParams<HomeTabParamList>
   ManualInput: undefined
   Schedule: undefined
   Notification: undefined
+  TicketDetail: { ticketId: string, source?: 'scan' | 'manual' | 'history' }
   // 🔥 Your screens go here
   // IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
 }

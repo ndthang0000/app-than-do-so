@@ -1,22 +1,32 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo, forwardRef, useImperativeHandle } from 'react';
 import { View, ViewStyle } from 'react-native';
 import { Text } from '../Text';
 
 interface ScanningTimerProps {
   isActive: boolean;
-  maxTime: number; // 15
+  maxTime: number;
   onTimeout: () => void;
-  style: any
+  style?: any;
 }
 
-export const ScanningTimer = memo(({ isActive, maxTime, onTimeout, style }: ScanningTimerProps) => {
+// Định nghĩa interface cho Ref
+export interface ScanningTimerRef {
+  getElapsed: () => number;
+}
+
+export const ScanningTimer = memo(forwardRef<ScanningTimerRef, ScanningTimerProps>((props, ref) => {
+  const { isActive, maxTime, onTimeout, style } = props;
   const [elapsed, setElapsed] = useState(0);
+
+  // Expose giá trị elapsed ra cho component cha
+  useImperativeHandle(ref, () => ({
+    getElapsed: () => elapsed,
+  }));
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-
     if (isActive) {
-      setElapsed(0); // Reset khi bắt đầu scan mới
+      setElapsed(0);
       interval = setInterval(() => {
         setElapsed((prev) => {
           const nextValue = prev + 0.1;
@@ -27,33 +37,29 @@ export const ScanningTimer = memo(({ isActive, maxTime, onTimeout, style }: Scan
           }
           return nextValue;
         });
-      }, 100); // Cập nhật mỗi 100ms
+      }, 100);
     }
-
     return () => clearInterval(interval);
   }, [isActive, maxTime, onTimeout]);
 
   if (!isActive) return null;
 
-  // Tính toán màu sắc dựa trên tiến độ
-  const isWarning = elapsed > maxTime * 0.7; // Cảnh báo khi qua 70% thời gian
+  const isWarning = elapsed > maxTime * 0.7;
 
   return (
     <View style={[$timerContainer, style]}>
       <Text
-        // Hiển thị 1 chữ số thập phân (VD: 1.2s, 1.4s)
         text={`${elapsed.toFixed(1)}s / ${maxTime}s`}
         size="xxs"
         weight="bold"
         style={{ color: isWarning ? '#EF4444' : '#10B981' }}
       />
-      {/* Thanh progress bar nhỏ chạy phía dưới số giây (optional) */}
       <View style={$progressBarBase}>
         <View style={[$progressBarActive, { width: `${(elapsed / maxTime) * 100}%` }]} />
       </View>
     </View>
   );
-});
+}));
 
 const $timerContainer: ViewStyle = {
   alignItems: 'center',

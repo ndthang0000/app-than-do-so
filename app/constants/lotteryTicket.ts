@@ -31,6 +31,15 @@ export interface ScanResult {
   station?: string;
 }
 
+export interface CheckAndSavePayload {
+  region: Region;
+  date: string;
+  station: string;
+  code: string;
+  specialCode?: string; // Ký hiệu (thường dành cho miền Bắc)
+  durationScan: number;
+}
+
 export const LOTTERY_TYPOGRAPHY = {
   db: {
     fontSize: 21,      // To hơn để dễ đọc

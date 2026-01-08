@@ -21,8 +21,10 @@ import Toast from 'react-native-toast-message';
 import { PhotoRecognizer, useTextRecognition } from 'react-native-vision-camera-ocr-plus';
 import { ScanInfoOverlay } from '@/components/Scan/ScanInfoOverlay';
 import { ScanResult } from '@/constants/lotteryTicket';
-import { fastParseFrame, getMostFrequent } from '@/utils/fastParseFrame';
-import { ScanningTimer } from '@/components/Scan/ScanningTimer';
+import { fastParseFrame } from '@/utils/fastParseFrame';
+import { ScanningTimer, ScanningTimerRef } from '@/components/Scan/ScanningTimer';
+import { prepareTicketPayload } from '@/utils/ticket-helper';
+import { api } from '@/services/api';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -40,16 +42,24 @@ const widthPercent = 90;
 const heightPercent = (FRAME_HEIGHT / screenHeight) * 100;
 
 const CONFIDENCE_THRESHOLD = {
-  code: 8,
+  code: 3,
   station: 3,
   date: 5,
 };
 
+const DETERMINE_THRESHOLD = {
+  code: 9,
+  station: 4,
+  date: 9,
+}
 
 const createDefaultStats = () => ({
   codes: {} as Record<string, number>,
   stations: {} as Record<string, number>,
   dates: {} as Record<string, number>,
+  codeBest: { value: "", freq: 0 },
+  stationBest: { value: "", freq: 0 },
+  dateBest: { value: "", freq: 0 },
 });
 
 console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
@@ -83,7 +93,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
   const { navigation } = _props;
   const { themed, theme: { colors, spacing } } = useAppTheme();
-
+  const timerRef = useRef<ScanningTimerRef>(null);
   // Camera & Permissions logic
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -91,6 +101,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
   const [shouldRenderCamera, setShouldRenderCamera] = useState(false);
   const [isPermissionGranted, setIsPermissionGranted] = useState(false);
+  const [isTimeout, setIsTimeout] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScanningActive, setIsScanningActive] = useState(false);
@@ -102,9 +114,9 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const isCapturingRef = useRef(false); // Tránh việc hàm chụp bị lặp chồng chéo
   const isTakingPhotoRef = useRef(false);
   const isStoppingRef = useRef(false);
+
   // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
-
   const startAutoCapture = () => {
     if (captureIntervalRef.current || isStoppingRef.current) return;
 
@@ -131,7 +143,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       } finally {
         isTakingPhotoRef.current = false;
       }
-    }, 500);
+    }, 400);
   };
 
   const handleOCR = useRunOnJS((frameData) => {
@@ -165,15 +177,18 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       statsRef.current[statsKey][val] = (statsRef.current[statsKey][val] || 0) + 1;
 
       // 2. TÌM GIÁ TRỊ TỐT NHẤT TRONG KHO
-      const bestMatch = getMostFrequent(statsRef.current[statsKey]);
+      // const bestMatch = getMostFrequent(statsRef.current[statsKey]);
+      if (statsRef.current[statsKey][val] > statsRef.current[`${key}Best`].freq) {
+        statsRef.current[`${key}Best`] = { value: val, freq: statsRef.current[statsKey][val] };
+      }
 
       // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
       // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
-      if (bestMatch.freq >= CONFIDENCE_THRESHOLD[key]) {
+      if (statsRef.current[`${key}Best`].freq >= CONFIDENCE_THRESHOLD[key]) {
         setScanResult(prev => {
           // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
-          if (prev[key] !== bestMatch.value) {
-            return { ...prev, [key]: bestMatch.value };
+          if (prev[key] !== statsRef.current[`${key}Best`].value) {
+            return { ...prev, [key]: statsRef.current[`${key}Best`].value };
           }
           return prev;
         });
@@ -185,14 +200,17 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       startAutoCapture();
     }
 
-
-    if (scanResult.code && scanResult.station && scanResult.date) {
+    const isFullyCaptured =
+      statsRef.current.codeBest.freq >= DETERMINE_THRESHOLD.code &&
+      statsRef.current.stationBest.freq >= DETERMINE_THRESHOLD.station &&
+      statsRef.current.dateBest.freq >= DETERMINE_THRESHOLD.date;
+    if (isFullyCaptured) {
       setIsScanningActive(false);
       setHasFoundResult(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-      // Bạn có thể navigate hoặc hiện Modal kết quả tại đây
+      stopAutoCapture();
     }
-  }, [isScanningActive, isCapturingRef]);
+
+  }, [isScanningActive, isCapturingRef, hasFoundResult]);
 
   const { scanText } = useTextRecognition({
     language: 'latin',
@@ -281,8 +299,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         const actualWidth = paddedW / scale;
         const actualHeight = paddedH / scale;
 
-        // console.log("DEBUG CROP:", { actualOriginY, scale, offsetY, fY });
-
         if (actualWidth > 0 && actualHeight > 0) {
           const manipulatedImage = await ImageManipulator.manipulateAsync(
             uri,
@@ -344,20 +360,32 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         // Tăng đếm tần suất
         const statsKey = key === 'code' ? 'codes' : key === 'station' ? 'stations' : 'dates';
         statsRef.current[statsKey][val] = (statsRef.current[statsKey][val] || 0) + 5; // 5 điểm cho ảnh chụp
+        if (statsRef.current[statsKey][val] > statsRef.current[`${key}Best`].freq) {
+          statsRef.current[`${key}Best`] = { value: val, freq: statsRef.current[statsKey][val] };
+        }
 
-        // 2. TÌM GIÁ TRỊ TỐT NHẤT TRONG KHO
-        const bestMatch = getMostFrequent(statsRef.current[statsKey]);
 
         // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
         // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
-        if (bestMatch.freq >= CONFIDENCE_THRESHOLD[key]) {
+        if (statsRef.current[`${key}Best`].freq >= CONFIDENCE_THRESHOLD[key]) {
           setScanResult(prev => {
             // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
-            if (prev[key] !== bestMatch.value) {
-              return { ...prev, [key]: bestMatch.value };
+            if (prev[key] !== statsRef.current[`${key}Best`].value) {
+              return { ...prev, [key]: statsRef.current[`${key}Best`].value };
             }
             return prev;
           });
+        }
+
+        const isFullyCaptured =
+          statsRef.current.codeBest.freq >= DETERMINE_THRESHOLD.code &&
+          statsRef.current.stationBest.freq >= DETERMINE_THRESHOLD.station &&
+          statsRef.current.dateBest.freq >= DETERMINE_THRESHOLD.date;
+
+        if (isFullyCaptured) {
+          setIsScanningActive(false);
+          setHasFoundResult(true);
+          stopAutoCapture();
         }
       });
 
@@ -399,10 +427,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   }
 
   const handleTimeout = useCallback(() => {
-    stopAutoCapture();
-    setIsScanningActive(false);
-    // navigation.navigate('ScanTimeoutScreen');
-  }, [navigation]);
+    setIsTimeout(true);
+  }, []);
 
   const stopAutoCapture = () => {
     isStoppingRef.current = true; // Chặn mọi yêu cầu chụp mới ngay lập tức
@@ -486,6 +512,50 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     };
   }, [navigation]);
 
+  useEffect(() => {
+    async function callAPICheckTicket() {
+      if (hasFoundResult && scanResult.code && scanResult.station && scanResult.date) {
+        const duration = timerRef.current?.getElapsed() || 0;
+
+        const payload = prepareTicketPayload(scanResult, duration);
+        console.log("🚀 Payload gửi đi:", payload);
+
+        // Gọi API check-and-save của bạn ở đây
+        setIsLoading(true);
+        const response = await api.checkAndSave(payload);
+        setIsLoading(false);
+        setHasFoundResult(false);
+        if (response.kind === 'ok') {
+          navigation.navigate('TicketDetail', { ticketId: response?.data?.data?.ticket?._id, source: 'scan' });
+        } else {
+          // xử lý lỗi
+          Toast.show({
+            type: 'error',
+            text1: `  ❌ Lỗi: ${response.kind || 'Không thể kết nối đến máy chủ'}`,
+            position: 'bottom',
+            bottomOffset: 150,
+            visibilityTime: 700,
+          });
+        }
+      }
+    }
+    callAPICheckTicket();
+  }, [hasFoundResult]);
+
+  useEffect(() => {
+    if (isTimeout) {
+      // Dừng mọi tiến trình trước khi đi
+      stopAutoCapture();
+      setIsScanningActive(false);
+
+      // Navigate sau khi kết thúc chu kỳ render
+      navigation.navigate("ErrorOCR");
+
+      // Reset lại để tránh quay lại màn hình bị lặp lại logic
+      setIsTimeout(false);
+    }
+  }, [isTimeout]);
+
   // Dọn dẹp khi unmount component hoặc khi tắt scan tay
   useEffect(() => {
     return () => stopAutoCapture();
@@ -547,11 +617,12 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             </TouchableOpacity>
           }
         />
-        <ScanInfoOverlay isVisible={isScanningActive} data={scanResult} />
+        <ScanInfoOverlay isVisible={(isScanningActive || hasFoundResult)} data={scanResult} />
 
         <ScanningTimer
+          ref={timerRef}
           isActive={isScanningActive}
-          maxTime={15}
+          maxTime={10}
           onTimeout={handleTimeout}
           style={themed($scanTimerWrapper)}
         />

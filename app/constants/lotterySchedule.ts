@@ -136,5 +136,5 @@ export const FUZZY_PROVINCE_KEYWORDS: Record<string, string[]> = {
   "Đắk Nông": ["DAK NONG", "XO SO KIEN THIET DAK NONG"],
 
   // MIỀN BẮC
-  "Miền Bắc": ["MIEN BAC", "HA NOI", "QUANG NINH", "BAC NINH", "HAI PHONG", "NAM DINH", "THAI BINH"],
+  "Miền Bắc": ["MIEN BAC", "HA NOI"],
 };

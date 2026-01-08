@@ -129,6 +129,28 @@ export class Api {
     }
     return { kind: "ok", data: response.data }
   }
+
+  async checkAndSave(payload: any): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
+    const response: ApiResponse<any> = await this.apisauce.post("/tickets/check-and-save", payload)
+
+    if (!response.ok) {
+      const problem = getGeneralApiProblem(response)
+      if (problem) return problem
+
+    }
+    return { kind: "ok", data: response.data }
+  }
+
+  async getTicketById(ticketId: string): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
+    const response: ApiResponse<any> = await this.apisauce.get(`/tickets/${ticketId}`)
+
+    if (!response.ok) {
+      const problem = getGeneralApiProblem(response)
+      if (problem) return problem
+
+    }
+    return { kind: "ok", data: response.data }
+  }
 }
 
 export const api = new Api()

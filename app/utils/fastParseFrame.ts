@@ -191,56 +191,30 @@ export const fastParseFrame = (lines: string[], currentDate: string | undefined,
 
     // 2. Tìm NGÀY (Regex tối giản chỉ tìm định dạng dd-mm-yyyy)
     if (!result.date) {
+      // 1. Chuẩn hóa dòng: Thay thế mọi ký tự phân cách (space, dot, slash) thành dấu gạch ngang
+      // Ví dụ: "02 - 1 / 2026" -> "02---1-/-2026"
+      // Sau đó xóa bỏ khoảng trắng thừa
+      const normalized = line.replace(/\s+/g, '').replace(/[./]/g, '-');
 
-      const dateMatch = line.match(/\d{2}[-./]\d{1,2}[-./]\d{4}/);
+      // 2. Regex siêu linh hoạt
+      // Nhóm 1 (\d{1,2}): Ngày (1 hoặc 2 số)
+      // Ký tự phân cách [-]* : Cho phép nhiều dấu gạch ngang liên tiếp (do kết quả replace ở trên)
+      // Nhóm 2 (\d{1,2}): Tháng (1 hoặc 2 số)
+      // Nhóm 3 (202[4-6]): Năm
+      const flexibleMatch = normalized.match(/(\d{1,2})-*(\d{1,2})-*(202[4-6])/);
 
-      if (dateMatch) {
-        const potentialDate = dateMatch[0];
+      if (flexibleMatch) {
+        const [_, dStr, mStr, yStr] = flexibleMatch;
 
-        // CHỈ LẤY NẾU NGÀY HỢP LỆ
+        // 3. Chuẩn hóa về định dạng dd-mm-yyyy (Thêm số 0 nếu thiếu)
+        const day = dStr.padStart(2, '0');
+        const month = mStr.padStart(2, '0');
+        const potentialDate = `${day}-${month}-${yStr}`;
+
         if (isValidLotteryDate(potentialDate)) {
-
-          // result.date = potentialDate. Conver to dd-mm-yyyy
-          const [d, m, y] = potentialDate.split(/[-./]/).map(Number);
-          const day = d.toString().padStart(2, '0');
-          const month = m.toString().padStart(2, '0');
-          result.date = `${day}-${month}-${y}`;
+          result.date = potentialDate;
         }
       }
-      else {
-        // 1. Làm sạch dòng: Loại bỏ khoảng trắng hoàn toàn
-        // Ví dụ: "09 - 01 2026" -> "09-012026"
-
-        const cleanedLine = line.replace(/\s+/g, '');
-
-        // 2. Regex linh hoạt hơn: 
-        // Tìm: 2 số (ngày) + 1 ký tự ngăn cách (tùy chọn) + 2 số (tháng) + 1 ký tự ngăn cách (tùy chọn) + 4 số (năm)
-        // Đặc biệt: Nhắm vào năm 202X (thời điểm hiện tại)
-        const flexibleDateMatch = cleanedLine.match(/(\d{2})[-./]?(\d{2})[-./]?(202[4-6])/);
-
-        if (flexibleDateMatch) {
-          const [_, dayStr, monthStr, yearStr] = flexibleDateMatch;
-
-          // Tạo format chuẩn để check hợp lệ
-          const potentialDate = `${dayStr}-${monthStr}-${yearStr}`;
-
-          if (isValidLotteryDate(potentialDate)) {
-            result.date = potentialDate;
-          }
-        }
-        // 3. Fallback: Nếu OCR bị mất ký tự ngăn cách hoàn toàn (ví dụ: 09012026)
-        else {
-          const strictDigitMatch = cleanedLine.match(/(\d{2})(\d{2})(202[4-6])/);
-          if (strictDigitMatch) {
-            const [__, d, m, y] = strictDigitMatch;
-            const potentialDate = `${d}-${m}-${y}`;
-            if (isValidLotteryDate(potentialDate)) {
-              result.date = potentialDate;
-            }
-          }
-        }
-      }
-
     }
     if (isImage) {
       result.station = findStationWithLevenshtein(lines, result.date || currentDate);

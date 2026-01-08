@@ -16,7 +16,8 @@ export interface Ticket {
   winDetails: string[];
   prizes: any; // Bạn có thể định nghĩa interface chi tiết hơn cho prizes
   message: string;
-  weight: number;
+  prizeMoney: number;
+  durationScan: number;
   createdAt: string;
   updatedAt: string;
 }

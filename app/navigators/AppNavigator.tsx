@@ -21,6 +21,8 @@ import Toast from "react-native-toast-message"
 import { getToastConfig } from "@/components/toastConfig"
 import { WelcomeScreen } from "@/screens/WelcomeScreen"
 import { useAppSelector } from "@/store"
+import { ErrorOCRScreen } from "@/screens/ErrorOCR"
+import { TicketDetailScreen } from "@/screens/TicketDetailScreen"
 
 /**
  * This is a list of all the route names that will exit the app if the back button
@@ -65,6 +67,8 @@ const AppStack = () => {
         <>
           {/* Khi isAuthenticated = true, bộ màn hình này mới tồn tại */}
           <Stack.Screen name="Main" component={MainNavigator} />
+          <Stack.Screen name="ErrorOCR" component={ErrorOCRScreen} />
+          <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
           <Stack.Screen name="ManualInput" component={ManualInputScreen} />
           <Stack.Screen name="Schedule" component={LotteryScheduleScreen} />
           <Stack.Screen name="Notification" component={NotificationScreen} />

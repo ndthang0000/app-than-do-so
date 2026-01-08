@@ -76,21 +76,22 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
     dispatch(setFilters({ winStatus: STATUS_MAP[label] }));
   };
 
-  const handleFilterRegion = (label: string) => {
-    dispatch(setFilters({ region: REGION_MAP[label] }));
-  };
+
+  const BackIcon = () => (
+    <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
+      <IconBack width={20} height={20} color={colors.text} />
+    </TouchableOpacity>
+  );
 
   return (
     <>
       <Header
-        title="LỊCH SỬ DÒ SỐ"
-        LeftActionComponent={
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
-            <IconBack width={22} height={22} color={colors.text} />
-          </TouchableOpacity>
-        }
+        title="Lịch sử vé"
+        LeftActionComponent={<BackIcon />}
         safeAreaEdges={["top"]}
-        containerStyle={{ backgroundColor: colors.surface }}
+        backgroundColor={colors.background}
+        containerStyle={{ paddingHorizontal: spacing.md, backgroundColor: colors.surface }}
+        titleStyle={{ color: colors.text, fontWeight: "bold", fontSize: 20 }}
       />
 
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -141,7 +142,7 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
         <FlatList
           data={tickets}
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => <TicketItem ticket={item} />}
+          renderItem={({ item }) => <TicketItem ticket={item} onPress={(i) => navigation.navigate('TicketDetail', { ticketId: i._id })} />}
           contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}
           ListEmptyComponent={
             !loading ? (
