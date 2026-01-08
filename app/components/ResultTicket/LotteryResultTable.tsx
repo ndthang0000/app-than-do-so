@@ -110,8 +110,9 @@ export function LotteryResultTable({ region, isLive }: Props) {
 
           if (newNumbers.length > 0) {
             // Chỉ lấy số đầu tiên về để đọc (tránh đọc dồn dập khi về nhiều số cùng lúc)
-            const target = newNumbers[0];
-            playNewSoundWithDucking(payload.station, target.rank, target.value);
+            newNumbers.forEach((num: any) => {
+              playNewSoundWithDucking(payload.station, num.rank, num.value);
+            })
           }
           const idsToRemove = payload.changes.map((c: any) => `${payload.station}-${c.rank}-${c.index}`)
 

@@ -191,7 +191,7 @@ export const fastParseFrame = (lines: string[], currentDate: string | undefined,
 
     // 2. Tìm NGÀY (Regex tối giản chỉ tìm định dạng dd-mm-yyyy)
     if (!result.date) {
-      // Regex tìm định dạng dd/mm/yyyy hoặc dd-mm-yyyy
+
       const dateMatch = line.match(/\d{2}[-./]\d{1,2}[-./]\d{4}/);
 
       if (dateMatch) {
@@ -207,6 +207,40 @@ export const fastParseFrame = (lines: string[], currentDate: string | undefined,
           result.date = `${day}-${month}-${y}`;
         }
       }
+      else {
+        // 1. Làm sạch dòng: Loại bỏ khoảng trắng hoàn toàn
+        // Ví dụ: "09 - 01 2026" -> "09-012026"
+
+        const cleanedLine = line.replace(/\s+/g, '');
+
+        // 2. Regex linh hoạt hơn: 
+        // Tìm: 2 số (ngày) + 1 ký tự ngăn cách (tùy chọn) + 2 số (tháng) + 1 ký tự ngăn cách (tùy chọn) + 4 số (năm)
+        // Đặc biệt: Nhắm vào năm 202X (thời điểm hiện tại)
+        const flexibleDateMatch = cleanedLine.match(/(\d{2})[-./]?(\d{2})[-./]?(202[4-6])/);
+
+        if (flexibleDateMatch) {
+          const [_, dayStr, monthStr, yearStr] = flexibleDateMatch;
+
+          // Tạo format chuẩn để check hợp lệ
+          const potentialDate = `${dayStr}-${monthStr}-${yearStr}`;
+
+          if (isValidLotteryDate(potentialDate)) {
+            result.date = potentialDate;
+          }
+        }
+        // 3. Fallback: Nếu OCR bị mất ký tự ngăn cách hoàn toàn (ví dụ: 09012026)
+        else {
+          const strictDigitMatch = cleanedLine.match(/(\d{2})(\d{2})(202[4-6])/);
+          if (strictDigitMatch) {
+            const [__, d, m, y] = strictDigitMatch;
+            const potentialDate = `${d}-${m}-${y}`;
+            if (isValidLotteryDate(potentialDate)) {
+              result.date = potentialDate;
+            }
+          }
+        }
+      }
+
     }
     if (isImage) {
       result.station = findStationWithLevenshtein(lines, result.date || currentDate);

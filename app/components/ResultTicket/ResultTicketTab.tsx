@@ -16,14 +16,15 @@ export function ResultTicketTab() {
         tabBarInactiveTintColor: colors.textDim,
         tabBarIndicatorStyle: {
           backgroundColor: colors.primary,
-          height: 2,
+          height: 3,
+          borderRadius: 3
         },
         tabBarStyle: {
           backgroundColor: colors.surface,
         },
         tabBarLabelStyle: {
-          fontWeight: "700",
-          fontSize: 16
+          fontWeight: "bold",
+          fontSize: 17
         },
 
       }}
