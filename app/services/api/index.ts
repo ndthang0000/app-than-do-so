@@ -3,8 +3,7 @@ import Config from "@/config"
 import { GeneralApiProblem, getGeneralApiProblem } from "./apiProblem"
 import type { ApiConfig } from "./types"
 import { store } from "@/store"
-import axios from "axios"
-import { loginByDevice, logout, setAuthToken } from "@/store/slices/authSlice"
+import { loginByDevice, logout } from "@/store/slices/authSlice"
 
 export const DEFAULT_API_CONFIG: ApiConfig = {
   url: Config.API_URL + '/api',
@@ -53,40 +52,19 @@ export class Api {
           originalRequest._retry = true
 
           try {
-            // Gọi API refresh token riêng biệt bằng axios thuần để tránh loop vô tận
-            const refreshToken = store.getState().auth.refreshToken
-            const deviceId = store.getState().auth.deviceId // Lấy từ store của bạn
 
-            const res = await axios.post(`${this.config.url}/auth/refresh-token`, {
-              refreshToken,
-              deviceId
-            })
-
-            const { accessToken, newRefreshToken } = res.data
-
-            // Lưu token mới vào Redux
-            store.dispatch(setAuthToken({
-              token: accessToken,
-              refreshToken: newRefreshToken
-            }))
+            const { accessToken } = await store.dispatch(loginByDevice()).unwrap()
 
             // Cập nhật header và thực hiện lại request cũ
             originalRequest.headers.Authorization = `Bearer ${accessToken}`
             return this.apisauce.axiosInstance(originalRequest)
-          } catch (refreshError) {
-            try {
-              // Lưu ý: Dùng unwrap() để lấy dữ liệu trực tiếp từ thunk
-              const result = await store.dispatch(loginByDevice()).unwrap()
 
-              // Cập nhật Token mới vào request cũ và thử lại lần cuối
-              originalRequest.headers.Authorization = `Bearer ${result.accessToken}`
-              return this.apisauce.axiosInstance(originalRequest)
-            } catch (reLoginError) {
+          } catch (refreshError) {
+
               // Nếu đến cả Login bằng Device cũng lỗi (VD: server sập, Device bị ban)
               // Lúc này mới thực sự cho logout
               store.dispatch(logout())
-              return Promise.reject(reLoginError)
-            }
+            return Promise.reject(refreshError)
           }
         }
         return Promise.reject(error)
@@ -110,7 +88,6 @@ export class Api {
 
   async getLotteryResults(date: string, region: string, station: string): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
     const response: ApiResponse<any> = await this.apisauce.get("/lottery-results", { date, region, station })
-
     if (!response.ok) {
       const problem = getGeneralApiProblem(response)
       if (problem) return problem
@@ -143,6 +120,16 @@ export class Api {
 
   async getTicketById(ticketId: string): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
     const response: ApiResponse<any> = await this.apisauce.get(`/tickets/${ticketId}`)
+    if (!response.ok) {
+      const problem = getGeneralApiProblem(response)
+      if (problem) return problem
+
+    }
+    return { kind: "ok", data: response.data }
+  }
+
+  async subscribeToNotificationTopic(payload: any): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
+    const response: ApiResponse<any> = await this.apisauce.post("/notifications/subscribe-topic", payload)
 
     if (!response.ok) {
       const problem = getGeneralApiProblem(response)

@@ -17,7 +17,6 @@ export const CentraResult = () => {
 
   const isUpcoming = type === "UPCOMING" && isSelectedToday
   const isLive = type === "LIVE"
-  const isFinished = type === "FINISHED"
 
   return <>
     <Screen

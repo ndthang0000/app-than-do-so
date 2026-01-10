@@ -35,7 +35,9 @@ import { Provider } from "react-redux"
 import { persistor, store } from "./store"
 import { PersistGate } from "redux-persist/lib/integration/react"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
+
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
+
 // Web linking configuration
 const prefix = Linking.createURL("/")
 const config = {

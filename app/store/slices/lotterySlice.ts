@@ -9,7 +9,7 @@ export interface LotteryResult {
   region: "north" | "central" | "south"
   station: string
   prizes: Record<string, any>
-  isLive: boolean
+  isFinished: boolean
   type: string
   updatedAt: string,
   loto?: Record<string, string[]>

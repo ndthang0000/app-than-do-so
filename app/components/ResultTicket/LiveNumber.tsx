@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { Text } from "../Text";
 import { TextStyle, View, ViewStyle } from "react-native";
-import { BALL_COLORS, LOTTERY_NUMBER_LENGTH, Region } from "@/constants/lotteryTicket";
-import { PrizeKey } from "./HeaderRow";
+import { BALL_COLORS, LOTTERY_NUMBER_LENGTH, PrizeKey, Region } from "@/constants/lotteryTicket";
 import { DisplayMode } from "./LotteryResultTable";
 
 export type NumberType = 'PENDING' | 'ROLLING' | 'NEW' | 'DONE';

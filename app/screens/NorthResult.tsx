@@ -18,7 +18,6 @@ export const NorthResult = memo(() => {
 
   const isUpcoming = type === "UPCOMING" && isSelectedToday
   const isLive = type === "LIVE" && isSelectedToday
-  const isFinished = type === "FINISHED"
 
 
   return <>

@@ -20,9 +20,11 @@ import { NotificationScreen } from "@/screens/NotificationScreen"
 import Toast from "react-native-toast-message"
 import { getToastConfig } from "@/components/toastConfig"
 import { WelcomeScreen } from "@/screens/WelcomeScreen"
-import { useAppSelector } from "@/store"
+import { useAppDispatch, useAppSelector } from "@/store"
 import { ErrorOCRScreen } from "@/screens/ErrorOCR"
 import { TicketDetailScreen } from "@/screens/TicketDetailScreen"
+import { useEffect } from "react"
+import { loginByDevice } from "@/store/slices/authSlice"
 
 /**
  * This is a list of all the route names that will exit the app if the back button
@@ -43,15 +45,25 @@ const AppStack = () => {
   // Lưu ý: path này phụ thuộc vào cách bạn đặt rootReducer, 
   // thường là state.auth._persist.rehydrated hoặc dùng selector riêng
   const isRehydrated = useAppSelector((state) => state.auth._persist?.rehydrated)
-
+  const dispatch = useAppDispatch();
   // Logic kiểm tra: Nếu có authToken thì coi như đã login
   const token = useAppSelector((state) => state.auth.authToken)
+  const user = useAppSelector((state) => state.auth.user)
   console.log(token)
   const isAuthenticated = !!token
 
   // Quan trọng: Nếu chưa nạp xong dữ liệu từ MMKV, 
   // hãy trả về null hoặc SplashScreen để tránh render WelcomeScreen quá sớm
   if (!isRehydrated) return null
+
+  useEffect(() => {
+    async function fetchUserData() {
+      if (!user && isRehydrated) {
+        dispatch(loginByDevice());
+      }
+    }
+    fetchUserData();
+  }, [user, isRehydrated])
 
   return (
     <Stack.Navigator

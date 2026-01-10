@@ -4,23 +4,36 @@ import DeviceInfo from "react-native-device-info"
 import hmacSHA256 from "crypto-js/hmac-sha256"
 import Hex from "crypto-js/enc-hex"
 import { APP_CRYPTO_KEY } from '@env';
-import { saveString } from "@/utils/storage"
 import { REHYDRATE } from "redux-persist"
+
+export interface NotificationSettings {
+  ticketResult: boolean;
+  centralResult: boolean;
+  southResult: boolean;
+  northResult: boolean;
+  system: boolean;
+  promotion: boolean;
+}
+interface User {
+  _id: string;
+  role: string;
+  settingNotifications?: NotificationSettings; // Thêm field này
+}
 
 interface AuthState {
   authToken: string | null
-  refreshToken: string | null
   deviceId: string | null
   status: "idle" | "loading" | "authenticated" | "failed"
   error: string | null
+  user: User | null
 }
 
 const initialState: AuthState = {
   authToken: null,
-  refreshToken: null,
   deviceId: null,
   status: "idle",
   error: null,
+  user: null,
 }
 
 /**
@@ -46,8 +59,8 @@ export const loginByDevice = createAsyncThunk(
       if (response.kind === "ok") {
         return {
           accessToken: response.data.data.accessToken,
-          refreshToken: response.data.data.refreshToken,
           deviceId,
+          user: response.data.data.user,
         }
       } else {
         return rejectWithValue(response)
@@ -56,22 +69,33 @@ export const loginByDevice = createAsyncThunk(
       return rejectWithValue(e.message)
     }
   },
-)
+);
+
+(async () => {
+  const deviceId = await DeviceInfo.getUniqueId()
+  const timestamp = Date.now()
+
+  // Tạo Signature bảo mật để tránh spam tạo user ảo
+  const message = `${deviceId}|${timestamp}`
+  const signature = hmacSHA256(message, APP_CRYPTO_KEY).toString(Hex)
+  console.log({ deviceId, timestamp, signature })
+})()
 
 export const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
     // Cập nhật Token khi Interceptor thực hiện Refresh thành công
-    setAuthToken: (state, action: PayloadAction<{ token: string; refreshToken?: string }>) => {
-      state.authToken = action.payload.token
-      if (action.payload.refreshToken) {
-        state.refreshToken = action.payload.refreshToken
+    updateNotificationSettings: (state, action: PayloadAction<Partial<NotificationSettings>>) => {
+      if (state.user) {
+        state.user.settingNotifications = {
+          ...state.user.settingNotifications,
+          ...action.payload,
+        } as NotificationSettings;
       }
     },
     logout: (state) => {
       state.authToken = null
-      state.refreshToken = null
       state.status = "idle"
     },
   },
@@ -84,8 +108,8 @@ export const authSlice = createSlice({
       .addCase(loginByDevice.fulfilled, (state, action) => {
         state.status = "authenticated"
         state.authToken = action.payload.accessToken
-        state.refreshToken = action.payload.refreshToken
         state.deviceId = action.payload.deviceId
+        state.user = action.payload.user
       })
       .addCase(loginByDevice.rejected, (state, action) => {
         state.status = "failed"
@@ -101,5 +125,5 @@ export const authSlice = createSlice({
   },
 })
 
-export const { setAuthToken, logout } = authSlice.actions
+export const { logout, updateNotificationSettings } = authSlice.actions
 export default authSlice.reducer

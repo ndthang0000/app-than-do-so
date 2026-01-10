@@ -10,7 +10,7 @@ import { ticketSlice } from "./slices/ticketSlice"
 const authPersistConfig = {
   key: "auth",
   storage: reduxStorage,
-  whitelist: ["authToken", "refreshToken", "deviceId"], // Chỉ lưu những thứ này
+  whitelist: ["authToken", "deviceId"], // Chỉ lưu những thứ này
 }
 
 const rootReducer = combineReducers({

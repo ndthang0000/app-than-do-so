@@ -8,28 +8,52 @@ import { Text } from "@/components/Text";
 import { Header } from '@/components/Header';
 import IconBell from "@assets/svg/bell-active.svg";
 import IconCheckCircle from "@assets/svg/check-circle.svg";
+import IconPayment from "@assets/svg/payment.svg";
 import { api } from '@/services/api';
-import { useAppSelector } from '@/store';
+import { useAppSelector, useAppDispatch } from '@/store'; // Thêm dispatch để sync thông báo
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { LOTTERY_SCHEDULE } from '@/constants/lotterySchedule';
-import { parse, differenceInSeconds, startOfDay, add } from 'date-fns';
+import { differenceInSeconds, startOfDay, add, parse } from 'date-fns';
+import { Ticket } from '@/store/slices/ticketSlice';
+import { formatVietnameseMoney } from '@/utils/formatMoney';
+import ConfettiCannon from 'react-native-confetti-cannon';
+import { syncNotificationSettings } from '@/services/notificationService';
 
 export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> = function TicketDetailScreen(_props) {
   const { navigation, route } = _props;
   const { ticketId, source } = route.params;
   const { themed, theme: { colors, spacing } } = useAppTheme();
 
-  // Bottom Sheet Ref
+  const user = useAppSelector((state) => state.auth.user);
+  const isSubscribed = user?.settingNotifications?.ticketResult;
+
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['40%'], []);
 
-  const [ticket, setTicket] = useState<any>(null);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ hours: '00', minutes: '00', seconds: '00' });
 
   const ticketFromStore = useAppSelector((state) =>
     state.ticket.tickets.find((t) => t._id === ticketId)
   );
+  const dispatch = useAppDispatch();
+
+const handleConfirmSubscription = async () => {
+  // Hiển thị loading nếu muốn (tùy chọn)
+  
+  const result = await syncNotificationSettings(dispatch, user?.settingNotifications, {
+    ticketResult: true // Bật trạng thái nhận thông báo vé
+  });
+
+  if (result.success) {
+    bottomSheetRef.current?.close();
+    // Toast thông báo thành công
+  } else {
+    // Xử lý lỗi (ví dụ: người dùng từ chối quyền)
+    alert("Không thể bật thông báo. Vui lòng kiểm tra cài đặt thiết bị.");
+  }
+};
 
   useEffect(() => {
     if (ticketFromStore) {
@@ -39,20 +63,23 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
     }
   }, [ticketId, ticketFromStore]);
 
-  // Logic Countdown
+  // Logic Countdown Chính Xác
   useEffect(() => {
-    if (ticket?.winStatus !== "PENDING") return;
+    if (ticket?.winStatus !== "PENDING" || !ticket?.date) return;
 
     const timer = setInterval(() => {
-      // Tìm lịch mở thưởng của đài này
       const regionData = LOTTERY_SCHEDULE.find(r => r.region === ticket.region);
-      const drawTimeStr = regionData?.time || "16:15"; // Mặc định 16:15 nếu ko tìm thấy
+      const drawTimeStr = regionData?.time || "16:15";
 
-      const today = startOfDay(new Date());
+      // Parse ngày từ ticket.date (dd-MM-yyyy)
+      const ticketDateStart = startOfDay(parse(ticket.date, 'dd-MM-yyyy', new Date()));
       const [hours, minutes] = drawTimeStr.split(':').map(Number);
-      const drawDate = add(today, { hours, minutes });
 
-      const diff = differenceInSeconds(drawDate, new Date());
+      // Ngày mở thưởng = Ngày trên vé + Giờ mở thưởng của đài
+      const drawDate = add(ticketDateStart, { hours, minutes });
+
+      const now = new Date();
+      const diff = differenceInSeconds(drawDate, now);
 
       if (diff <= 0) {
         setTimeLeft({ hours: '00', minutes: '00', seconds: '00' });
@@ -83,16 +110,26 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
   };
 
   const handleOpenNoti = useCallback(() => {
+    if (isSubscribed) return; // Nếu đã đăng ký rồi thì không mở sheet nữa
     bottomSheetRef.current?.expand();
-  }, []);
+  }, [isSubscribed]);
+
+
+
+
+
+  const isPending = ticket?.winStatus === "PENDING";
+  const isWin = ticket?.winStatus === "WIN";
 
   useEffect(() => {
-    // after 500ms open the bottom sheet
-    const timer = setTimeout(() => {
-      bottomSheetRef.current?.expand();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+    // Tự động mở sheet nếu chưa đăng ký nhận tin
+    if (!isSubscribed && ticket && isPending) {
+      const timer = setTimeout(() => {
+        bottomSheetRef.current?.expand();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isSubscribed, ticket, isPending]);
 
   if (loading || !ticket) {
     return (
@@ -102,11 +139,18 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
     );
   }
 
-  const isPending = ticket.winStatus === "PENDING";
-  const isWin = ticket.winStatus === "WIN";
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {isWin && (
+        <ConfettiCannon 
+          count={300}           // Số lượng mảnh pháo
+          origin={{x: -10, y: 0}} // Vị trí bắt đầu (thường là đỉnh màn hình)
+          autoStart={true} 
+          fadeOut={true}        // Tự động mờ dần
+          fallSpeed={1000}      // Tốc độ rơi
+          colors={['#FBBF24', '#22C55E', '#FFFFFF', '#FF0000']} // Màu sắc pháo hoa
+        />
+      )}
       <Header
         title={source === 'scan' ? "Dò số" : "Chi tiết vé"}
         leftIcon="back"
@@ -116,6 +160,7 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
       />
       <Screen preset="scroll" style={themed($container)}>
         <View style={themed($mainContent)}>
+          
           <View style={themed($ticketCard)}>
             <View style={themed($ticketBody)}>
               <Text text={ticket.station} style={themed($stationText)} size='xxl' />
@@ -124,21 +169,43 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
             </View>
           </View>
 
-          {/* HIỂN THỊ KẾ T QUẢ KHI ĐÃ CÓ (WIN/LOSE) */}
-          {!isPending && (
-            <View style={themed($resultStatusWrapper)}>
-              <View style={[themed($statusBadge), { backgroundColor: isWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]}>
-                <Text
-                  text={isWin ? "TRÚNG THƯỞNG" : "KHÔNG TRÚNG"}
-                  weight="bold"
-                  style={{ color: isWin ? '#22C55E' : '#EF4444' }}
-                />
+          {/* KHU VỰC HIỂN THỊ TRẠNG THÁI ĐỒNG BỘ */}
+          <View style={themed($resultStatusWrapper)}>
+            {isPending ? (
+              <View style={[themed($statusBadge), { backgroundColor: 'rgba(251, 191, 36, 0.1)', borderColor: '#FBBF24', borderWidth: 1 }]}>
+                <Text text="ĐANG CHỜ QUAY" weight="bold" style={{ color: '#FBBF24' }} />
               </View>
-              {isWin && (
-                <Text text={`Giải: ${ticket.prizeName || 'Đặc Biệt'}`} style={themed($whiteText)} />
-              )}
-            </View>
-          )}
+            ) : (
+              <>
+                <View style={[themed($statusBadge), { backgroundColor: isWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(223, 106, 106, 0.2)' }]}>
+                  <Text
+                    text={isWin ? `🏆 TRÚNG THƯỞNG: ${ticket.winDetails.join(',')}` : "😔KHÔNG TRÚNG"}
+                    weight="bold"
+                    style={{ color: isWin ? '#22C55E' : colors.palette.neutral500 }}
+                  />
+                </View>
+                  {isWin && (
+                    <View style={themed($moneyWrapper)}>
+                      <View style={themed($moneyIconWrapper)}>
+                        <IconPayment width={30} height={30} color={'#eab307'} />
+                      </View>
+                      <View>
+                        <Text
+                          text="Giá trị giải thưởng"
+                          style={{ color: colors.textDim, marginTop: 4 }}
+                        />
+                        <Text
+                          text={`${formatVietnameseMoney(ticket.prizeMoney) || 'Đặc Biệt'}`}
+                          style={{ color: colors.text }}
+                          size='xl'
+                          weight='bold'
+                        />
+                      </View>
+                    </View>
+                )}
+              </>
+            )}
+          </View>
 
           {isPending && (
             <View style={themed($countDownSection)}>
@@ -153,13 +220,32 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
             </View>
           )}
 
-          <TouchableOpacity style={themed($buttonAction)} activeOpacity={0.8} onPress={handleOpenNoti}>
-            <Text text="Nhận thông báo kết quả" weight="bold" style={themed($buttonText)} />
-          </TouchableOpacity>
+          {/* NÚT BẤM THAY ĐỔI THEO STATE USER */}
+          {
+            isPending && (
+              <TouchableOpacity
+                style={[themed($buttonAction), isSubscribed && { backgroundColor: '#2D2D1C', borderWidth: 1, borderColor: colors.palette.neutral600 }]}
+                activeOpacity={0.8}
+                onPress={handleOpenNoti}
+              >
+                {(isSubscribed ? (
+                  <>
+                    <IconCheckCircle width={20} height={20} color={colors.palette.primary400} style={{ marginRight: 8 }} />
+                    <Text text="Đã đăng ký nhận kết quả" weight="bold" style={[themed($buttonText), { color: colors.palette.primary400 }]} />
+                  </>
+                ) : (
+                  <>
+                    <IconBell width={20} height={20} color={colors.palette.neutral900} style={{ marginRight: 8 }} />
+                    <Text text="Nhận thông báo kết quả" weight="bold" style={themed($buttonText)} />
+                  </>
+                ))}
+              </TouchableOpacity>
+            )
+          }
+
         </View>
       </Screen>
 
-      {/* BOTTOM SHEET CHO THÔNG BÁO */}
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
@@ -177,12 +263,20 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
             text="Chúng tôi sẽ gửi thông báo ngay khi có kết quả xổ số để bạn không bỏ lỡ vận may."
             style={[themed($dimText), { textAlign: 'center', marginTop: spacing.sm }]}
           />
-          <TouchableOpacity style={[themed($buttonAction), { width: '100%', marginTop: spacing.lg }]}>
-            <IconCheckCircle width={20} height={20} color={colors.text} style={{ marginRight: 8 }} />
-            <Text text="Nhận thông báo" weight="bold" style={themed($buttonText)} />
+          <TouchableOpacity
+            style={[themed($buttonAction), { width: '100%', marginTop: spacing.lg }]}
+            onPress={handleConfirmSubscription}
+          >
+            <Text text="Xác nhận nhận tin" weight="bold" style={themed($buttonText)} />
           </TouchableOpacity>
         </BottomSheetView>
       </BottomSheet>
+      {isWin && (
+  <>
+    <ConfettiCannon count={100} origin={{x: 0, y: 600}} explosionSpeed={350} />
+    <ConfettiCannon count={100} origin={{x: 400, y: 600}} explosionSpeed={350} />
+  </>
+)}
     </View>
   );
 };
@@ -201,14 +295,16 @@ const TimerBox = ({ value, label }: { value: string, label: string }) => {
 /** Styles bổ sung */
 const $resultStatusWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: 'center',
-  marginTop: spacing.lg,
-  gap: spacing.xs
+  marginTop: spacing.md,
+  gap: spacing.xs,
 })
 
 const $statusBadge: ViewStyle = {
   paddingHorizontal: 20,
   paddingVertical: 8,
-  borderRadius: 20,
+  borderRadius: 12,
+  alignItems: 'center',
+  justifyContent: 'center',
 }
 
 const $bottomSheetContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -290,8 +386,7 @@ const $buttonAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: 'center',
   marginTop: 24,
   paddingHorizontal: spacing.lg,
-  flexDirection: 'row',
-  marginBottom: 'auto'
+  flexDirection: 'row', // Quan trọng để icon và text nằm ngang
 });
 const $buttonText: TextStyle = { color: '#1A1A10', fontSize: 16 };
 const $loadingContainer: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -300,3 +395,32 @@ const $loadingContainer: ThemedStyle<ViewStyle> = ({ colors }) => ({
   alignItems: "center",
   backgroundColor: "#1A1A10",
 })
+
+const $moneyWrapper: ThemedStyle<ViewStyle> = ({ spacing,colors }) => ({
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: spacing.xs,
+  gap: spacing.md,
+  width: '100%',
+  backgroundColor: colors.surface,
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.md,
+  borderRadius: 20,
+  //boxShadow
+  shadowColor: "#afa1a1ff",
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.25,
+  shadowRadius: 3.84,
+  elevation: 5,
+});
+
+const $moneyIconWrapper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: spacing.md,
+  backgroundColor: '#fdf7e6',
+  borderRadius: 16,
+});

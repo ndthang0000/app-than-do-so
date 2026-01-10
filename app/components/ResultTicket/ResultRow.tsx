@@ -1,13 +1,12 @@
-import React, { useMemo } from "react"
+import React from "react"
 import { View, ViewStyle } from "react-native"
 import LinearGradient from "react-native-linear-gradient"
 import { useAppTheme } from "@/theme/context"
 import { Text } from "../Text"
 import { LiveNumber } from "./LiveNumber"
-import { PrizeKey } from "./HeaderRow"
 import { ThemedStyle } from "@/theme/types"
 import { DisplayMode } from "./LotteryResultTable"
-import { LOTTERY_TYPOGRAPHY, Region } from "@/constants/lotteryTicket"
+import { LOTTERY_TYPOGRAPHY, PrizeKey, Region } from "@/constants/lotteryTicket"
 import { LotteryResult } from "@/store/slices/lotterySlice"
 import { useAppSelector } from "@/store"
 
@@ -24,10 +23,10 @@ function PrizeNumbers({
   numbers: string[]
   isTwoRow: boolean
   textStyle: any
-    region: Region
-    prizeKey: PrizeKey
-    getLiveState: (num: string, idx: number) => 'DONE' | 'ROLLING' | 'PENDING' | 'NEW',
-    displayMode: DisplayMode
+  region: Region
+  prizeKey: PrizeKey
+  getLiveState: (num: string, idx: number) => 'DONE' | 'ROLLING' | 'PENDING' | 'NEW',
+  displayMode: DisplayMode
 }) {
   const renderLiveNumber = (num: string, idx: number) => (
     <View key={`${idx}`} style={{ justifyContent: "center", alignItems: "center", marginVertical: 2 }}>
@@ -210,7 +209,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
           <View key={p._id} style={themed([wrapperStyle, { flex: flex }])}>
             {content}
           </View>
-          )
+        )
       })}
     </View>
   )

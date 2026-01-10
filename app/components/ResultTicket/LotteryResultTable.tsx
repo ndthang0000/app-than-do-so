@@ -1,4 +1,4 @@
-import { TouchableOpacity, View, ViewStyle } from "react-native"
+import { AppState, TouchableOpacity, View, ViewStyle } from "react-native"
 import { HeaderRow } from "./HeaderRow"
 import { ResultRow } from "./ResultRow"
 import { ThemedStyle } from "@/theme/types"
@@ -46,10 +46,12 @@ export function LotteryResultTable({ region, isLive }: Props) {
   const rollingSoundRef = useRef<Sound | null>(null);
   const newSoundRef = useRef<Sound | null>(null);
   const [isSoundReady, setIsSoundReady] = useState(false);
+  const [appState, setAppState] = useState(AppState.currentState);
 
   const handleChangeDisplayMode = (mode: DisplayMode) => {
     setDisplayMode(mode)
   }
+  const isFinished = provinces.every(province => province.isFinished);
 
   const calculateFlex = provinces.length == 3 ? 2 : (provinces.length == 1 ? 5 : 3);
 
@@ -79,13 +81,37 @@ export function LotteryResultTable({ region, isLive }: Props) {
     // Mỗi khi dateSelected hoặc region thay đổi, hàm này sẽ tự kiểm tra cache
     if (!isFocused) return;
 
+    if (appState !== "active") return;
+
     dispatch(fetchLotteryIfNeeded({
       date: dateSelected,
       region: region,
       noCache: isLive && isFocused, // Nếu đang ở chế độ
     }))
 
-  }, [dateSelected, dispatch, isFocused])
+  }, [dateSelected, dispatch, isFocused, appState])
+
+  useEffect(() => {
+    if (appState !== "active" || isFinished) {
+      // Ứng dụng chuyển sang nền, tạm dừng nhạc
+      rollingSoundRef.current?.pause();
+    } else {
+      // Ứng dụng trở lại foreground, nếu isLive thì tiếp tục phát nhạc
+      if (isLive) {
+        rollingSoundRef.current?.play();
+      }
+    }
+  }, [appState, isLive, isFinished]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", nextAppState => {
+      setAppState(nextAppState);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     // 1. Kết nối
@@ -141,7 +167,7 @@ export function LotteryResultTable({ region, isLive }: Props) {
     let timer: NodeJS.Timeout;
 
     const startSound = () => {
-      if (isLive && isSoundReady && rollingSoundRef.current && isFocused) {
+      if (isLive && isSoundReady && rollingSoundRef.current && isFocused && !isFinished) {
         // Đảm bảo volume mức cao
         rollingSoundRef.current.setVolume(0.5);
 
@@ -171,7 +197,6 @@ export function LotteryResultTable({ region, isLive }: Props) {
       if (error) {
         console.log('Lỗi load nhạc:', error);
       } else {
-        console.log('Load nhạc thành công', region);
         sound.setNumberOfLoops(-1); // Lặp vô hạn
         sound.setVolume(0.5);
         rollingSoundRef.current = sound;
