@@ -71,7 +71,7 @@ const initialState: TicketState = {
     totalPages: 0,
   },
   filters: {
-    sortBy: "weight:desc", // Mặc định như API ví dụ
+    sortBy: "createdAt:desc", // Mặc định như API ví dụ
   },
 };
 

@@ -10,12 +10,14 @@ import IconCalendar from "@assets/svg/calendar.svg";
 import { ThemedStyle } from "@/theme/types";
 import { Text } from "@/components/Text";
 import { ResultTicketTab } from "@/components/ResultTicket/ResultTicketTab";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DatePicker } from "@/components/DatePicker";
 import { addDays, format, isAfter, isToday, parseISO, startOfDay } from "date-fns";
 import Toast from "react-native-toast-message";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setDateSelected } from "@/store/slices/lotterySlice";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { ResultSettingsSheet } from "@/components/ResultTicket/ResultSettingsSheet";
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
   // how to get params from _props.route.params
@@ -26,7 +28,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
 
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
-
+  const settingsSheetRef = useRef<BottomSheet>(null);
 
   // Kiểm tra xem ngày đang chọn có phải hôm nay không để chặn nút Next
   const isSelectedToday = isToday(parseISO(dateSelected));
@@ -43,6 +45,11 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   else if (regionDrawStatus.north.type === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MB";
   }
+
+  const openSettings = () => {
+    settingsSheetRef.current?.expand();
+  };
+
   const handleDateSelect = (dateString: string) => {
     // Chặn nếu người dùng cố tình chọn ngày tương lai từ DatePicker (nếu DatePicker chưa chặn)
     if (isAfter(parseISO(dateString), startOfDay(new Date()))) {
@@ -100,7 +107,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
 
   const SettingPressableIcon = () => {
     return (
-      <TouchableOpacity onPress={() => console.log('navigate to settings')} activeOpacity={0.5}>
+      <TouchableOpacity onPress={openSettings} activeOpacity={0.5} style={{ padding: 8 }}>
         <IconSetting width={22} height={22} />
       </TouchableOpacity>
     )
@@ -113,7 +120,8 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   );
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
+
       <Header
         title={tittleHeader}
         safeAreaEdges={["top"]}
@@ -163,7 +171,8 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
         </Modal>
       </View>
       <ResultTicketTab />
-    </>
+      <ResultSettingsSheet ref={settingsSheetRef} />
+    </View>
   )
 }
 

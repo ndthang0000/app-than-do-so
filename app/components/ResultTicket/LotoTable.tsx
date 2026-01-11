@@ -4,7 +4,6 @@ import { Text } from "../Text";
 import LinearGradient from "react-native-linear-gradient"
 import { ThemedStyle } from "@/theme/types";
 import { useAppTheme } from "@/theme/context";
-import { ProvinceResult } from "./HeaderRow";
 import { Region } from "@/constants/lotteryTicket";
 import { LotteryResult } from "@/store/slices/lotterySlice";
 

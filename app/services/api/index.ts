@@ -138,6 +138,17 @@ export class Api {
     }
     return { kind: "ok", data: response.data }
   }
+
+  async updateMyProfile(payload: any): Promise<{ kind: "ok"; data: any } | GeneralApiProblem> {
+    const response: ApiResponse<any> = await this.apisauce.patch("/users", payload)
+
+    if (!response.ok) {
+      const problem = getGeneralApiProblem(response)
+      if (problem) return problem
+
+    }
+    return { kind: "ok", data: response.data }
+  }
 }
 
 export const api = new Api()

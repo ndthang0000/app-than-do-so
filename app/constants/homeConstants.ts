@@ -2,7 +2,7 @@
 import IconManualInput from "@assets/svg/input-manual.svg";
 import IconMyTicket from "@assets/svg/my-ticket.svg";
 import IconCalendar from "@assets/svg/calendar.svg";
-import { format, startOfDay, addMinutes, differenceInMinutes, isAfter } from 'date-fns';
+import { startOfDay, addMinutes, isAfter } from 'date-fns';
 import { Region } from "./lotteryTicket";
 
 export const REGION_DATA = [

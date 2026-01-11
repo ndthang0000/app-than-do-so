@@ -14,16 +14,29 @@ export interface NotificationSettings {
   system: boolean;
   promotion: boolean;
 }
+
+export interface AppSettings {
+  theme?: string;
+  language?: string;
+  showLotoTable?: boolean;
+  isVoiceEnabled?: boolean;
+  isMusicEnabled?: boolean;
+  fontSize?: string;
+  highlightHead: string[];
+  highlightTail: string[];
+}
 interface User {
   _id: string;
   role: string;
   settingNotifications?: NotificationSettings; // Thêm field này
+  settingApp?: AppSettings;
 }
 
 interface AuthState {
   authToken: string | null
   deviceId: string | null
   status: "idle" | "loading" | "authenticated" | "failed"
+  isUpdating: boolean; // Trạng thái loading riêng cho update
   error: string | null
   user: User | null
 }
@@ -32,6 +45,7 @@ const initialState: AuthState = {
   authToken: null,
   deviceId: null,
   status: "idle",
+  isUpdating: false,
   error: null,
   user: null,
 }
@@ -71,6 +85,22 @@ export const loginByDevice = createAsyncThunk(
   },
 );
 
+export const updateUserProfile = createAsyncThunk(
+  "auth/updateUserProfile",
+  async (payload: any, { rejectWithValue }) => {
+    try {
+      const response = await api.updateMyProfile(payload);
+      if (response.kind === "ok") {
+        return response.data.data; // Trả về user object mới
+      } else {
+        return rejectWithValue(response);
+      }
+    } catch (e: any) {
+      return rejectWithValue(e.message);
+    }
+  }
+);
+
 (async () => {
   const deviceId = await DeviceInfo.getUniqueId()
   const timestamp = Date.now()
@@ -98,6 +128,20 @@ export const authSlice = createSlice({
       state.authToken = null
       state.status = "idle"
     },
+    updateUserData: (state, action: PayloadAction<Partial<User>>) => {
+      state.user = action.payload as User;
+    },
+    optimisticUpdateAppSetting: (state, action: PayloadAction<Partial<AppSettings>>) => {
+      if (state.user?.settingApp) {
+        state.user.settingApp = { ...state.user.settingApp, ...action.payload };
+      }
+    },
+    // Cập nhật nhanh Notification cho UI
+    optimisticUpdateNotiSetting: (state, action: PayloadAction<Partial<NotificationSettings>>) => {
+      if (state.user?.settingNotifications) {
+        state.user.settingNotifications = { ...state.user.settingNotifications, ...action.payload };
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -115,6 +159,16 @@ export const authSlice = createSlice({
         state.status = "failed"
         state.error = action.payload as string
       })
+      .addCase(updateUserProfile.pending, (state) => {
+        state.isUpdating = true;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.isUpdating = false;
+        state.user = action.payload; // Cập nhật user mới từ API
+      })
+      .addCase(updateUserProfile.rejected, (state) => {
+        state.isUpdating = false;
+      })
       .addCase(REHYDRATE, (state, action: any) => {
         if (action.payload?.authToken) {
           state.status = "authenticated";
@@ -125,5 +179,12 @@ export const authSlice = createSlice({
   },
 })
 
-export const { logout, updateNotificationSettings } = authSlice.actions
+export const {
+  logout,
+  updateNotificationSettings,
+  updateUserData,
+  optimisticUpdateAppSetting,
+  optimisticUpdateNotiSetting,
+} = authSlice.actions
+
 export default authSlice.reducer
