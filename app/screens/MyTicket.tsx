@@ -76,6 +76,13 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
     dispatch(setFilters({ winStatus: STATUS_MAP[label] }));
   };
 
+  const handleLoadMore = () => {
+    // Only load more if not already loading and there are more pages
+    if (!loading && pagination.page < pagination.totalPages) {
+      dispatch(setPage(pagination.page + 1));
+    }
+  };
+
 
   const BackIcon = () => (
     <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
@@ -155,6 +162,8 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
           ListFooterComponent={loading ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} /> : null}
           onRefresh={() => dispatch(setPage(1))}
           refreshing={loading && pagination.page === 1}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
         />
       </View>
       <BottomSheet

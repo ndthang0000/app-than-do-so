@@ -151,7 +151,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     if (!isScanningActive || hasFoundResult) return;
 
 
-    const current = fastParseFrame(frameData.split('\n'), scanResult?.date);
+    const current = fastParseFrame(frameData.split('\n'), statsRef.current?.dateBest?.value);
     if (!current) return;
 
     // LOGIC NÂNG CAO: Chống nhầm lẫn mmyyyy

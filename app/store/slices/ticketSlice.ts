@@ -100,7 +100,8 @@ export const ticketSlice = createSlice({
       .addCase(fetchTickets.fulfilled, (state, action) => {
         const { results, page, limit, totalResults, totalPages } = action.payload;
         state.loading = false;
-        state.tickets = results;
+        // Append results for load more, replace for first page or filter change
+        state.tickets = page === 1 ? results : [...state.tickets, ...results];
         state.pagination = { page, limit, totalResults, totalPages };
       })
       .addCase(fetchTickets.rejected, (state, action) => {
