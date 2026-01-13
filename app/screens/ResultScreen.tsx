@@ -18,6 +18,7 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { setDateSelected } from "@/store/slices/lotterySlice";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { ResultSettingsSheet } from "@/components/ResultTicket/ResultSettingsSheet";
+import { DateSwipeWrapper } from "@/components/ResultTicket/DateSwipeWrapper";
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
   // how to get params from _props.route.params
@@ -171,6 +172,13 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
         </Modal>
       </View>
       <ResultTicketTab />
+      {/* <DateSwipeWrapper
+        onSwipeLeft={handleNext}
+        onSwipeRight={handlePrevious}
+        dependency={dateSelected} // Truyền vào để đồng bộ animation
+      >
+        <ResultTicketTab />
+      </DateSwipeWrapper> */}
       <ResultSettingsSheet ref={settingsSheetRef} />
     </View>
   )
