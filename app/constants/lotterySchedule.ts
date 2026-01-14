@@ -98,7 +98,7 @@ export const getRegionStatus = (region: string): DrawStatus => {
 export const FUZZY_PROVINCE_KEYWORDS: Record<string, string[]> = {
   // MIỀN NAM
   "Bình Dương": ["BINH DUONG", "XO SO KIEN THIET BINH DUONG"],
-  "TP.HCM": ["HO CHI MINH", "SAI GON", "HO CHI MIN"],
+  "TP.HCM": ["HO CHI MINH", "SAI GON", "HO CHI MIN", "CHI MINH", 'HO CHI'],
   "Đồng Tháp": ["DONG THAP", "ONGTHAP", "XO SO KIEN THIET DONG THAP"],
   "Cà Mau": ["CA MAU", "XO SO KIEN THIET CA MAU"],
   "Bến Tre": ["BEN TRE", "XO SO BEN TRE"],

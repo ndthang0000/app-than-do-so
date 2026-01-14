@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, ViewStyle, TextStyle } from 'react-native';
+import { View, ViewStyle, TextStyle, Platform } from 'react-native';
 import { ToastConfig } from 'react-native-toast-message';
 import { Text } from "@/components/Text"; // Sử dụng component Text của bạn
+import { Icon } from "@/components/Icon"; // Import Icon component
 
 // Hàm tạo config nhận theme từ app của bạn
 export const getToastConfig = (theme: any): ToastConfig => {
@@ -70,5 +71,68 @@ export const getToastConfig = (theme: any): ToastConfig => {
         </View>
       </View>
     ),
+
+    /* NOTIFICATION: Custom toast giống notification native cho foreground message
+    */
+    notification: ({ text1, text2, onPress }: any) => {
+      const $notificationContainer: ViewStyle = {
+        width: '92%',
+        backgroundColor: Platform.OS === 'ios'
+          ? 'rgba(255, 255, 255, 0.98)'
+          : 'rgba(255, 255, 255, 0.97)',
+        borderRadius: Platform.OS === 'ios' ? 12 : 8,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 10,
+        borderWidth: Platform.OS === 'android' ? 0.5 : 0,
+        borderColor: 'rgba(0, 0, 0, 0.08)',
+      };
+
+      const $iconContainer: ViewStyle = {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.palette.primary500 || '#2196F3',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.sm,
+      };
+
+      const $textContainer: ViewStyle = {
+        flex: 1,
+        justifyContent: 'center',
+      };
+
+      const $notificationTitle: TextStyle = {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1C1C1E',
+        marginBottom: 2,
+      };
+
+      const $notificationBody: TextStyle = {
+        fontSize: 13,
+        color: '#3C3C43',
+        lineHeight: 18,
+      };
+
+      return (
+        <View style={$notificationContainer}>
+          <View style={$iconContainer}>
+            <Icon icon="bell" size={22} color="#FFFFFF" />
+          </View>
+          <View style={$textContainer}>
+            <Text text={text1} style={$notificationTitle} numberOfLines={1} />
+            {text2 && <Text text={text2} style={$notificationBody} numberOfLines={2} />}
+          </View>
+        </View>
+      );
+    },
   };
 };

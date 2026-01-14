@@ -92,14 +92,15 @@ const handleForegroundMessage = (remoteMessage: any) => {
 
   console.log("Foreground message received:", remoteMessage);
 
-  // Hiển thị Toast với title và body từ notification
+  // Hiển thị Toast với UI giống notification native
   Toast.show({
-    type: 'success', // Có thể đổi thành 'info', 'error' tùy loại notification
+    type: 'notification', // Custom type với UI đẹp giống notification thật
     text1: notification?.title || 'Thông báo mới',
     text2: notification?.body || '',
-    visibilityTime: 4000,
+    visibilityTime: 5000,
     autoHide: true,
-    topOffset: 60,
+    topOffset: Platform.OS === 'ios' ? 50 : 10,
+    position: 'top',
     onPress: () => {
       // Khi user tap vào Toast, xử lý navigation
       Toast.hide();
