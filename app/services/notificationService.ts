@@ -3,6 +3,7 @@ import { api } from '@/services/api';
 import { updateNotificationSettings } from '@/store/slices/authSlice';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { navigate, navigationRef } from '@/navigators/navigationUtilities';
+import Toast from 'react-native-toast-message';
 
 export const requestUserPermission = async () => {
   if (Platform.OS === 'android' && Platform.Version >= 33) {
@@ -55,8 +56,7 @@ export const syncNotificationSettings = async (
 export const setupCloudMessaging = async () => {
   // 1. Lắng nghe tin nhắn khi App đang mở (Foreground)
   const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {
-    // Xử lý hiển thị Toast như bạn đã làm
-    console.log("Foreground message", remoteMessage);
+    handleForegroundMessage(remoteMessage);
   });
 
   // 2. Lắng nghe khi User nhấn vào thông báo từ trạng thái Background
@@ -82,6 +82,30 @@ export const setupCloudMessaging = async () => {
 
   // Trả về hàm unsubscribe để useEffect sử dụng
   return unsubscribeForeground;
+};
+
+/**
+ * Xử lý hiển thị notification khi app đang ở foreground
+ */
+const handleForegroundMessage = (remoteMessage: any) => {
+  const { notification, data } = remoteMessage;
+
+  console.log("Foreground message received:", remoteMessage);
+
+  // Hiển thị Toast với title và body từ notification
+  Toast.show({
+    type: 'success', // Có thể đổi thành 'info', 'error' tùy loại notification
+    text1: notification?.title || 'Thông báo mới',
+    text2: notification?.body || '',
+    visibilityTime: 4000,
+    autoHide: true,
+    topOffset: 60,
+    onPress: () => {
+      // Khi user tap vào Toast, xử lý navigation
+      Toast.hide();
+      handleNotificationAction(remoteMessage);
+    },
+  });
 };
 
 
