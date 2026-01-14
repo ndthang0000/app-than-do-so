@@ -117,12 +117,12 @@ const $gifContainer: ViewStyle = {
   justifyContent: 'center',
   alignItems: 'center',
   width: '100%',
+  paddingVertical: 4
 }
 
 const $longCauImage: ImageStyle = {
-  width: 20, // Điều chỉnh kích thước phù hợp với ô kết quả của bạn
-  height: 20, //TODO: here
-  padding: 2
+  width: 16, // Điều chỉnh kích thước phù hợp với ô kết quả của bạn
+  height: 16, //TODO: here
 }
 
 const $ballRow: ViewStyle = {

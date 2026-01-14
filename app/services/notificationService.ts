@@ -4,6 +4,18 @@ import { updateNotificationSettings } from '@/store/slices/authSlice';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { navigate, navigationRef } from '@/navigators/navigationUtilities';
 import Toast from 'react-native-toast-message';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+
+export const createNotificationChannel = async () => {
+  // Tạo channel (chỉ cần chạy một lần, Android sẽ tự ghi nhớ)
+  await notifee.createChannel({
+    id: 'default_channel_id', // ID này phải khớp 100% với channelId từ Backend gửi về
+    name: 'Thông báo kết quả',
+    importance: AndroidImportance.HIGH, // Cấp độ HIGH/MAX mới hiện Pop-up
+    sound: 'default',
+    vibration: true,
+  });
+};
 
 export const requestUserPermission = async () => {
   if (Platform.OS === 'android' && Platform.Version >= 33) {
@@ -54,34 +66,44 @@ export const syncNotificationSettings = async (
 };
 
 export const setupCloudMessaging = async () => {
-  // 1. Lắng nghe tin nhắn khi App đang mở (Foreground)
+  // 1. Lắng nghe tin nhắn khi App đang mở (Foreground) - FIREBASE
   const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {
     handleForegroundMessage(remoteMessage);
   });
 
-  // 2. Lắng nghe khi User nhấn vào thông báo từ trạng thái Background
+  // 2. Lắng nghe sự kiện nhấn của NOTIFEE (Bắt cả Foreground và Background)
+  const unsubscribeNotifee = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS) {
+      // Detail của Notifee chứa data trực tiếp trong notification
+      handleNotificationAction(detail.notification);
+    }
+  });
+
+  // 3. Lắng nghe khi User nhấn vào thông báo từ trạng thái Background - FIREBASE
   messaging().onNotificationOpenedApp((remoteMessage) => {
     handleNotificationAction(remoteMessage);
   });
 
-  // 3. Kiểm tra xem App có được mở từ trạng thái Quit hay không
+  // 4. Kiểm tra App mở từ trạng thái Quit - FIREBASE
   messaging()
     .getInitialNotification()
     .then((remoteMessage) => {
       if (remoteMessage) {
-        // Sử dụng Interval để đợi Navigation sẵn sàng (chuẩn Ignite)
         const checkNavReady = setInterval(() => {
           if (navigationRef.isReady()) {
             handleNotificationAction(remoteMessage);
             clearInterval(checkNavReady);
           }
         }, 200);
-        setTimeout(() => clearInterval(checkNavReady), 5000); // Stop sau 5s
+        setTimeout(() => clearInterval(checkNavReady), 5000);
       }
     });
 
-  // Trả về hàm unsubscribe để useEffect sử dụng
-  return unsubscribeForeground;
+  // Trả về hàm cleanup để useEffect gọi
+  return () => {
+    unsubscribeForeground();
+    unsubscribeNotifee();
+  };
 };
 
 /**
@@ -89,8 +111,6 @@ export const setupCloudMessaging = async () => {
  */
 const handleForegroundMessage = (remoteMessage: any) => {
   const { notification, data } = remoteMessage;
-
-  console.log("Foreground message received:", remoteMessage);
 
   // Hiển thị Toast với UI giống notification native
   Toast.show({
@@ -112,9 +132,9 @@ const handleForegroundMessage = (remoteMessage: any) => {
 
 const handleNotificationAction = (remoteMessage: any) => {
   const data = remoteMessage.data;
-  if (data?.screen === "ResultDetail") {
+  if (data?.screen === "Result") {
     // Navigate trực tiếp bằng helper của Ignite
-    navigate("ResultDetail", {
+    navigate("Result", {
       region: data.region
     })
   }

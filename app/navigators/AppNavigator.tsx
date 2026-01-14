@@ -104,8 +104,8 @@ export const AppNavigator = (props: NavigationProps) => {
     <NavigationContainer ref={navigationRef} theme={navigationTheme} {...props}>
       <ErrorBoundary catchErrors={Config.catchErrors}>
         <AppStack />
-        <Toast config={getToastConfig(theme)} />
       </ErrorBoundary>
+      <Toast config={getToastConfig(theme)} />
     </NavigationContainer>
   )
 }

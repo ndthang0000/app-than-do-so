@@ -35,7 +35,7 @@ import { Provider } from "react-redux"
 import { persistor, store } from "./store"
 import { PersistGate } from "redux-persist/lib/integration/react"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
-import { setupCloudMessaging } from "./services/notificationService"
+import { createNotificationChannel, setupCloudMessaging } from "./services/notificationService"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -106,6 +106,11 @@ export function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    createNotificationChannel();
+  }, []);
+
   // Before we show the app, we have to wait for our state to be ready.
   // In the meantime, don't render anything. This will be the background
   // color set in native by rootView's background color.

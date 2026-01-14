@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ViewStyle, TextStyle, Platform } from 'react-native';
+import { View, ViewStyle, TextStyle, Platform, TouchableOpacity } from 'react-native';
 import { ToastConfig } from 'react-native-toast-message';
 import { Text } from "@/components/Text"; // Sử dụng component Text của bạn
 import { Icon } from "@/components/Icon"; // Import Icon component
@@ -76,7 +76,7 @@ export const getToastConfig = (theme: any): ToastConfig => {
     */
     notification: ({ text1, text2, onPress }: any) => {
       const $notificationContainer: ViewStyle = {
-        width: '92%',
+        width: '90%',
         backgroundColor: Platform.OS === 'ios'
           ? 'rgba(255, 255, 255, 0.98)'
           : 'rgba(255, 255, 255, 0.97)',
@@ -123,7 +123,7 @@ export const getToastConfig = (theme: any): ToastConfig => {
       };
 
       return (
-        <View style={$notificationContainer}>
+        <TouchableOpacity style={$notificationContainer} activeOpacity={0.8} onPress={onPress}>
           <View style={$iconContainer}>
             <Icon icon="bell" size={22} color="#FFFFFF" />
           </View>
@@ -131,7 +131,7 @@ export const getToastConfig = (theme: any): ToastConfig => {
             <Text text={text1} style={$notificationTitle} numberOfLines={1} />
             {text2 && <Text text={text2} style={$notificationBody} numberOfLines={2} />}
           </View>
-        </View>
+        </TouchableOpacity>
       );
     },
   };
