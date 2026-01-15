@@ -119,7 +119,7 @@ const handleForegroundMessage = (remoteMessage: any) => {
     text2: notification?.body || '',
     visibilityTime: 5000,
     autoHide: true,
-    topOffset: Platform.OS === 'ios' ? 50 : 10,
+    topOffset: Platform.OS === 'ios' ? 50 : 30,
     position: 'top',
     onPress: () => {
       // Khi user tap vào Toast, xử lý navigation

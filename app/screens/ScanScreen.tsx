@@ -25,7 +25,10 @@ import { fastParseFrame } from '@/utils/fastParseFrame';
 import { ScanningTimer, ScanningTimerRef } from '@/components/Scan/ScanningTimer';
 import { prepareTicketPayload } from '@/utils/ticket-helper';
 import { api } from '@/services/api';
-
+import { loadTensorflowModel, TensorflowModel } from 'react-native-fast-tflite';
+import { decodeYOLOFloat32 } from '@/utils/yolov8';
+import { useResizePlugin } from 'vision-camera-resize-plugin';
+import * as MediaLibrary from 'expo-media-library';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
@@ -114,6 +117,12 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const isCapturingRef = useRef(false); // Tránh việc hàm chụp bị lặp chồng chéo
   const isTakingPhotoRef = useRef(false);
   const isStoppingRef = useRef(false);
+  const [model, setModel] = useState<TensorflowModel | null>(null);
+  const { resize } = useResizePlugin();
+  const frameCount = useRef(0);
+  const [detections, setDetections] = useState<any[]>([]);
+  const isAutoCapturing = useRef(false);
+  const lastDetections = useRef<any[]>([]);
 
   // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
@@ -145,6 +154,39 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       }
     }, 400);
   };
+
+  const updateVoting = useRunOnJS((label: string, value: string, isPhoto: boolean) => {
+    const points = isPhoto ? 10 : 1; // Ảnh chụp nét hơn nên điểm cao hơn
+    const category = `${label}s` as 'codes' | 'stations' | 'dates';
+    const bestKey = `${label}Best` as 'codeBest' | 'stationBest' | 'dateBest';
+
+    // 1. Cộng dồn điểm
+    statsRef.current[category][value] = (statsRef.current[category][value] || 0) + points;
+
+    // 2. Tìm giá trị có tổng điểm cao nhất
+    const currentScore = statsRef.current[category][value];
+    if (currentScore > statsRef.current[bestKey].freq) {
+      statsRef.current[bestKey] = { value, freq: currentScore };
+
+      // 3. Cập nhật UI ngay nếu đạt ngưỡng tin cậy (ví dụ 5 điểm)
+      if (currentScore >= 5) {
+        setScanResult(prev => ({ ...prev, [label]: value }));
+      }
+    }
+
+    // 4. Kiểm tra hoàn tất (Ngưỡng chốt kết quả: 25 điểm)
+    const isDone =
+      statsRef.current.codeBest.freq >= 25 &&
+      statsRef.current.dateBest.freq >= 25 &&
+      statsRef.current.stationBest.freq >= 15;
+
+    if (isDone && isScanningActive) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setHasFoundResult(true);
+      setIsScanningActive(false);
+      stopAutoCapture();
+    }
+  }, [isScanningActive]);
 
   const handleOCR = useRunOnJS((frameData) => {
     // Xử lý 7 Pipeline của bạn ở đây
@@ -224,14 +266,209 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   });
 
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
-    if (!isScanningActive || hasFoundResult) return;
-    const data = scanText(frame);
-    if (data && data.resultText) {
-      handleOCR(data.resultText);
+
+  const handleAIResults = useRunOnJS((results) => {
+    if (results.length === 0 || !isScanningActive || isAutoCapturing.current) return;
+
+    const filtered = Object.values(
+      results.reduce((acc: any, current: any) => {
+        if (!acc[current.className] || acc[current.className].confidence < current.confidence) {
+          acc[current.className] = current;
+        }
+        return acc;
+      }, {} as Record<string, any>)
+    );
+
+    setDetections(filtered as any[]);
+    lastDetections.current = filtered;
+
+    // CHIẾN THUẬT MỚI: Chỉ cần thấy ít nhất 1 vùng quan trọng là "Bắn" ngay
+    const shouldTrigger = filtered.some((d: any) =>
+      (d.className === 'code' || d.className === 'date') && d.confidence > 0.45
+    );
+
+    if (shouldTrigger) {
+      // Gọi hàm chụp ảnh ngay không cần đợi lockCounter
+      triggerBurstPhoto();
     }
   }, [isScanningActive]);
+
+  const processSubCrops = async (path: string, pW: number, pH: number) => {
+    const currentDetections = lastDetections.current;
+
+    // 1. Xác định hướng ảnh (Photo Orientation)
+    // Nếu pH > pW nghĩa là ảnh dọc, ngược lại là ảnh ngang.
+    const isPhotoPortrait = pH > pW;
+
+    // 2. Tính toán SquareSize dựa trên ảnh gốc
+    // Vì UI bạn dùng FRAME_WIDTH = screenWidth * 0.9, ta map tương ứng qua ảnh gốc
+    const squareSizeInPhoto = (isPhotoPortrait ? pW : pH) * 0.9;
+
+    const offsetX = (pW - squareSizeInPhoto) / 2;
+    const offsetY = (pH - squareSizeInPhoto) / 2;
+
+    for (const det of currentDetections) {
+      // 3. MA TRẬN CHUYỂN ĐỔI TỌA ĐỘ (Cực kỳ quan trọng)
+      // det.rect trả về giá trị 0-1 từ AI (đã fix xoay ở FrameProcessor)
+      // Chúng ta cần map nó về Pixel thực tế của ảnh chụp
+
+      // Giả sử AI đang nhìn theo hệ trục hoán đổi (giống UI)
+      let originX = offsetX + (1 - det.rect.top - det.rect.height) * squareSizeInPhoto;
+      let originY = offsetY + (det.rect.left) * squareSizeInPhoto;
+      let width = det.rect.height * squareSizeInPhoto;
+      let height = det.rect.width * squareSizeInPhoto;
+
+      // 4. THÊM PADDING 30% ĐỂ AN TOÀN (Tăng diện tích bao quanh chữ)
+      const padW = width * 0.1;
+      const padH = height * 0.1;
+
+      const finalX = Math.max(0, originX - padW);
+      const finalY = Math.max(0, originY - padH);
+      const finalW = Math.min(pW - finalX, width + padW * 2);
+      const finalH = Math.min(pH - finalY, height + padH * 2);
+
+      try {
+        const crop = await ImageManipulator.manipulateAsync(
+          path,
+          [{
+            crop: {
+              originX: Math.round(finalX),
+              originY: Math.round(finalY),
+              width: Math.round(finalW),
+              height: Math.round(finalH)
+            }
+          }],
+          { format: ImageManipulator.SaveFormat.JPEG, compress: 0.9 }
+        );
+
+        // DEBUG: Chia sẻ ảnh để xem AI đã cắt đúng chưa
+        // await Sharing.shareAsync(crop.uri); 
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          await MediaLibrary.saveToLibraryAsync(crop.uri);
+          console.log("📸 Đã lưu ảnh crop vào Gallery để kiểm tra!");
+        }
+        const ocrResult = await PhotoRecognizer({ uri: crop.uri });
+        if (ocrResult?.resultText) {
+          console.log("ocrResult", ocrResult.resultText)
+          const parsed = fastParseFrame(ocrResult.resultText.split('\n'), statsRef.current.dateBest.value);
+          console.log("parsed: ", parsed)
+          const validClasses = ['code', 'date', 'station'];
+          if (parsed && validClasses.includes(det.className)) {
+            const key = det.className as 'code' | 'date' | 'station';
+            if (parsed[key]) {
+              updateVoting(key, parsed[key] as any, true);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Lỗi cắt ảnh OCR:", e);
+      }
+    }
+  };
+
+  const triggerBurstPhoto = async () => {
+    console.log("đc chụp hình rồi đó")
+    if (!camera.current || isAutoCapturing.current) return;
+    isAutoCapturing.current = true;
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Chụp 2 tấm liên tiếp để lấy được tấm nét nhất
+      for (let i = 0; i < 2; i++) {
+        const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off' });
+        processSubCrops(photo.path, photo.width, photo.height);
+      }
+    } finally {
+      isAutoCapturing.current = false;
+    }
+  };
+
+  // Run model inference on the JS thread. Calling native JS objects inside a worklet
+  // causes errors because worklets run on a separate thread and cannot access JS state.
+  const handleFrameOnJS = useRunOnJS(async (buffer: ArrayBuffer) => {
+    try {
+      if (!isScanningActive || model == null) return;
+
+      // CHỈNH SỬA Ở ĐÂY: Chuyển ArrayBuffer sang Uint8Array
+      const inputData = new Uint8Array(buffer);
+
+      const outputs = await model.run([inputData]);
+
+      if (outputs && outputs.length > 0) {
+        const detections = decodeYOLOFloat32(outputs[0] as Float32Array);
+        if (detections.length > 0) {
+          handleAIResults(detections);
+        }
+      }
+    } catch (e) {
+      console.error('Error running model on JS thread:', e);
+    }
+  }, [isScanningActive, model]);
+
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+
+    // 1. Kiểm soát điều kiện và tần suất (3-5 FPS là đủ để tracking)
+    if (!isScanningActive || model == null) return;
+    frameCount.current++;
+    if (frameCount.current % 10 !== 0) return;
+
+    const isPortrait = frame.orientation === 'portrait' || frame.orientation === 'portrait-upside-down';
+    const frameActualWidth = isPortrait ? frame.width : frame.height;
+    const frameActualHeight = isPortrait ? frame.height : frame.width;
+
+    const scaleX = frameActualWidth / screenWidth;
+    const scaleY = frameActualHeight / screenHeight;
+
+    // 2. TÍNH CẠNH HÌNH VUÔNG
+    // Chúng ta lấy FRAME_WIDTH làm chuẩn để đảm bảo bao trọn chiều ngang vé số
+    const squareSizeInFrame = FRAME_WIDTH * scaleX;
+
+    // 3. Tọa độ X, Y để cắt chính giữa vùng Camera
+    // Đảm bảo không vượt quá kích thước frame
+    const cropX = Math.max(0, (frameActualWidth - squareSizeInFrame) / 2);
+    const cropY = Math.max(0, (frameActualHeight - squareSizeInFrame) / 2);
+
+    try {
+      // 2. Resize trực tiếp ra Float32
+      // Plugin sẽ tự động chuyển giá trị pixel về khoảng [0, 1] cho bạn
+      const resized = resize(frame, {
+        scale: { width: 640, height: 640 },
+        pixelFormat: 'rgb',
+        dataType: 'float32',
+      });
+      // 3. Chạy inference (Bản Float32 không cần cộng trừ 128)
+      // Lưu ý: Dùng mảng [resized] vì model mong đợi list tensors
+      const outputs = model.runSync([resized]);
+
+      if (outputs && outputs.length > 0) {
+        // Ép kiểu về Float32Array để tính toán
+        const outputTensor = outputs[0] as Float32Array;
+
+        // 4. Decode kết quả (Nhớ hạ threshold xuống như đã thảo luận)
+        const detections = decodeYOLOFloat32(outputTensor);
+        if (detections.length > 0) {
+          // Log để kiểm tra xem đã hiện đủ 3 nhãn chưa
+          console.log("Tìm thấy:", detections.map(d => d.className + '=' + d.confidence.toFixed(2)).join(', '));
+
+          // Gửi kết quả về JS Thread để xử lý UI hoặc chụp ảnh
+          handleAIResults(detections);
+        }
+      }
+    } catch (error) {
+      console.log("Lỗi Inference:", error);
+    }
+  }, [isScanningActive, model]);
+
+  // const frameProcessor = useFrameProcessor((frame) => {
+  //   'worklet';
+  //   if (!isScanningActive || hasFoundResult) return;
+  //   const data = scanText(frame);
+  //   if (data && data.resultText) {
+  //     handleOCR(data.resultText);
+  //   }
+  // }, [isScanningActive]);
 
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   // Thêm useRef để lưu tọa độ thực tế của khung quét
@@ -409,6 +646,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   };
 
+
   const handleToggleFlash = () => {
     setIsFlashOn(!isFlashOn);
     Toast.show({
@@ -450,6 +688,22 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     setScanResult({}); // Reset kết quả khi scan lại
     statsRef.current = createDefaultStats(); // Reset kho dữ liệu
   };
+
+  useEffect(() => {
+    async function loadAI() {
+      try {
+        // Đường dẫn này tùy thuộc vào việc bạn đặt file ở đâu (thường là trong assets)
+        const loadedModel = await loadTensorflowModel(require('@assets/model/best_float32.tflite'));
+        console.log("Model Inputs:", loadedModel.inputs);
+        console.log("Model Outputs:", loadedModel.outputs);
+        setModel(loadedModel);
+        console.log("✅ YOLOv8 Model Loaded");
+      } catch (e) {
+        console.error("❌ Lỗi load model AI:", e);
+      }
+    }
+    loadAI();
+  }, []);
 
 
   useEffect(() => {
@@ -594,6 +848,53 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         zoom={1}
         resizeMode='contain'
       />
+
+
+      {/* Vẽ các khung nhận diện */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {detections.map((det, index) => {
+          // 1. Kích thước vùng vuông bạn đã crop trong Frame Processor
+          const squareSize = screenWidth * 0.9;
+
+          // 2. Điểm bắt đầu của hình vuông này trên màn hình (để bù trừ tọa độ)
+          const offsetX = (screenWidth - squareSize) / 2;
+          const offsetY = (screenHeight - squareSize) / 2;
+
+          // 3. Công thức tính tọa độ UI dựa trên việc HOÁN ĐỔI TRỤC (đã fix ở bước trước)
+          // AI left -> UI top
+          // AI top -> UI right (UI left = 1 - top - width)
+
+          const uiWidth = det.rect.height * squareSize;
+          const uiHeight = det.rect.width * squareSize;
+
+          const uiLeft = offsetX + (1 - det.rect.top - det.rect.height) * squareSize;
+          const uiTop = offsetY + (det.rect.left * squareSize);
+
+          return (
+            <View
+              key={index}
+              style={{
+                position: 'absolute',
+                left: uiLeft,
+                top: uiTop,
+                width: uiWidth,
+                height: uiHeight,
+                borderWidth: 2,
+                borderColor: det.className === 'code' ? '#00FF00' : '#FFD700',
+                borderRadius: 4,
+                pointerEvents: 'none',
+                zIndex: 999
+              }}
+            >
+              <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', alignSelf: 'flex-start' }}>
+                <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+                  {det.className} {(det.confidence * 100).toFixed(0)}%
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
 
       <View style={themed($overlayContainer)}>
         <Header
