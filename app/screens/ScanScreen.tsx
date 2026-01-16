@@ -184,7 +184,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setHasFoundResult(true);
       setIsScanningActive(false);
-      stopAutoCapture();
     }
   }, [isScanningActive]);
 
@@ -284,10 +283,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
     // CHIẾN THUẬT MỚI: Chỉ cần thấy ít nhất 1 vùng quan trọng là "Bắn" ngay
     const shouldTrigger = filtered.some((d: any) =>
-      (d.className === 'code' || d.className === 'date') && d.confidence > 0.45
+      (d.className === 'code' || d.className === 'date') && d.confidence > 0.5
     );
 
     if (shouldTrigger) {
+      console.log("cay vcl")
       // Gọi hàm chụp ảnh ngay không cần đợi lockCounter
       triggerBurstPhoto();
     }
@@ -330,15 +330,18 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       try {
         const crop = await ImageManipulator.manipulateAsync(
           path,
-          [{
-            crop: {
-              originX: Math.round(finalX),
-              originY: Math.round(finalY),
-              width: Math.round(finalW),
-              height: Math.round(finalH)
-            }
-          }],
-          { format: ImageManipulator.SaveFormat.JPEG, compress: 0.9 }
+          [
+            {
+              crop: {
+                originX: Math.round(finalX),
+                originY: Math.round(finalY),
+                width: Math.round(finalW),
+                height: Math.round(finalH)
+              }
+            },
+            { resize: { width: 600 } }
+          ],
+          { format: ImageManipulator.SaveFormat.JPEG, compress: 0.8 }
         );
 
         // DEBUG: Chia sẻ ảnh để xem AI đã cắt đúng chưa
@@ -346,7 +349,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         const { status } = await MediaLibrary.requestPermissionsAsync();
         if (status === 'granted') {
           await MediaLibrary.saveToLibraryAsync(crop.uri);
-          console.log("📸 Đã lưu ảnh crop vào Gallery để kiểm tra!");
+          // console.log("📸 Đã lưu ảnh crop vào Gallery để kiểm tra!");
         }
         const ocrResult = await PhotoRecognizer({ uri: crop.uri });
         if (ocrResult?.resultText) {
@@ -367,18 +370,68 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   };
 
+  const processUnionCrop = async (path: string, pW: number, pH: number) => {
+    const boxes = lastDetections.current;
+    if (boxes.length === 0) return;
+
+    // 1. Tìm vùng bao quanh cực đại của 3 nhãn (Chỉ lấy phần chứa thông tin)
+    const minX = Math.min(...boxes.map(b => b.rect.left));
+    const minY = Math.min(...boxes.map(b => b.rect.top));
+    const maxX = Math.max(...boxes.map(b => b.rect.left + b.rect.width));
+    const maxY = Math.max(...boxes.map(b => b.rect.top + b.rect.height));
+
+    const squareSize = pW * 0.9;
+    const offsetX = (pW - squareSize) / 2;
+    const offsetY = (pH - squareSize) / 2;
+
+    // Chuyển tọa độ AI sang tọa độ ảnh chụp (đã fix hoán đổi trục)
+    const originX = offsetX + (1 - maxY) * squareSize;
+    const originY = offsetY + minX * squareSize;
+    const width = (maxY - minY) * squareSize;
+    const height = (maxX - minX) * squareSize;
+
+    try {
+      const crop = await ImageManipulator.manipulateAsync(
+        path,
+        [
+          {
+            crop: {
+              originX: Math.max(0, originX - 20), // Thêm chút lề an toàn
+              originY: Math.max(0, originY - 20),
+              width: width + 40,
+              height: height + 40
+            }
+          },
+          { resize: { width: 1000 } } // Resize để ML Kit đọc cực nhanh
+        ],
+        { format: ImageManipulator.SaveFormat.JPEG, compress: 0.6 }
+      );
+
+      const result = await PhotoRecognizer({ uri: crop.uri });
+
+      if (result?.resultText) {
+        const parsed = fastParseFrame(result.resultText.split('\n'), statsRef.current.dateBest.value);
+        if (!parsed) return;
+        // CHIẾN THUẬT "CHỐT NHANH": Nếu thấy Code, chốt ngay 15 điểm
+        if (parsed.code) updateVoting('code', parsed.code, true);
+        if (parsed.date) updateVoting('date', parsed.date, true);
+        if (parsed.station) updateVoting('station', parsed.station, true);
+      }
+    } catch (e) {
+      console.error("Lỗi Union Crop:", e);
+    }
+  };
+
   const triggerBurstPhoto = async () => {
-    console.log("đc chụp hình rồi đó")
+
     if (!camera.current || isAutoCapturing.current) return;
     isAutoCapturing.current = true;
 
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       // Chụp 2 tấm liên tiếp để lấy được tấm nét nhất
-      for (let i = 0; i < 2; i++) {
-        const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off' });
-        processSubCrops(photo.path, photo.width, photo.height);
-      }
+      console.log("đc chụp hình rồi đó")
+      const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off', enableShutterSound: false });
+      processSubCrops(photo.path, photo.width, photo.height);
     } finally {
       isAutoCapturing.current = false;
     }
