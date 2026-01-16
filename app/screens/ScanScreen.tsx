@@ -26,7 +26,6 @@ import { ScanningTimer, ScanningTimerRef } from '@/components/Scan/ScanningTimer
 import { prepareTicketPayload } from '@/utils/ticket-helper';
 import { api } from '@/services/api';
 
-
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
 const FRAME_WIDTH = screenWidth * 0.9;
@@ -119,11 +118,10 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
   const startAutoCapture = () => {
     if (captureIntervalRef.current || isStoppingRef.current) return;
-
-    captureIntervalRef.current = setInterval(async () => {
-      // THÊM: Nếu isScanningActive đã false thì phải dừng ngay lập tức
+    // Immediately capture once, then continue with regular interval
+    const captureOnce = async () => {
       if (!isScanningActive || !camera.current || isTakingPhotoRef.current || isProcessing || isStoppingRef.current) {
-        if (!isScanningActive) stopAutoCapture(); // Tự dọn dẹp nếu phát hiện trạng thái đã tắt
+        if (!isScanningActive) stopAutoCapture();
         return;
       }
 
@@ -134,7 +132,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
           enableShutterSound: false,
         });
 
-        // Kiểm tra lại lần nữa trước khi xử lý OCR nặng
         if (isScanningActive && !isStoppingRef.current) {
           processImageForOCR(photo.path, photo.width, photo.height, true);
         }
@@ -143,7 +140,13 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       } finally {
         isTakingPhotoRef.current = false;
       }
-    }, 400);
+    }
+
+    // Do the first capture immediately
+    captureOnce();
+
+    // Then schedule repeated captures every 400ms
+    captureIntervalRef.current = setInterval(captureOnce, 200);
   };
 
   const handleOCR = useRunOnJS((frameData) => {
@@ -284,8 +287,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         const { x: fX, y: fY, width: fW, height: fH } = frameLayout.current;
 
         // 2. TÍNH TOÁN VÙNG ĐỆM (PADDING) - Thêm 15% diện tích
-        const paddingX = fW * 0.15;
-        const paddingY = fH * 0.15;
+        const paddingX = fW * 0.05;
+        const paddingY = fH * 0.05;
         // Mở rộng tọa độ nhưng đảm bảo không vượt quá biên màn hình
         const paddedX = Math.max(offsetX, fX - paddingX);
         const paddedY = Math.max(offsetY, fY - paddingY);
@@ -316,6 +319,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
           );
           finalUri = manipulatedImage.uri;
+          // await MediaLibrary.saveToLibraryAsync(finalUri);
+          // const cleanedUri = await cleanImageForOCR(finalUri, 0, 0, manipulatedImage.width, manipulatedImage.height)
+          // finalUri = cleanedUri;
+          // save to gallery for testing
+          // await MediaLibrary.saveToLibraryAsync(finalUri);
         }
       } else {
         // NẾU LÀ ẢNH TỪ GALLERY (ĐÃ CROP TAY)
@@ -326,8 +334,11 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
           { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
         );
         finalUri = optimizedImage.uri;
+        // const cleanedUri = await cleanImageForOCR(finalUri, 0, 0, optimizedImage.width, optimizedImage.height)
+        // finalUri = cleanedUri;
+        // // save to gallery for testing
+        // await MediaLibrary.saveToLibraryAsync(finalUri);
       }
-
 
 
 
@@ -593,6 +604,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         photo={true}
         zoom={1}
         resizeMode='contain'
+        photoQualityBalance='speed'
+
       />
 
       <View style={themed($overlayContainer)}>
