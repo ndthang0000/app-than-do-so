@@ -176,9 +176,9 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
     // 4. Kiểm tra hoàn tất (Ngưỡng chốt kết quả: 25 điểm)
     const isDone =
-      statsRef.current.codeBest.freq >= 25 &&
-      statsRef.current.dateBest.freq >= 25 &&
-      statsRef.current.stationBest.freq >= 15;
+      statsRef.current.codeBest.freq >= 10 &&
+      statsRef.current.dateBest.freq >= 10 &&
+      statsRef.current.stationBest.freq >= 5;
 
     if (isDone && isScanningActive) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -348,13 +348,14 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         // await Sharing.shareAsync(crop.uri); 
         const { status } = await MediaLibrary.requestPermissionsAsync();
         if (status === 'granted') {
-          await MediaLibrary.saveToLibraryAsync(crop.uri);
+          // await MediaLibrary.saveToLibraryAsync(crop.uri);
           // console.log("📸 Đã lưu ảnh crop vào Gallery để kiểm tra!");
         }
         const ocrResult = await PhotoRecognizer({ uri: crop.uri });
         if (ocrResult?.resultText) {
           console.log("ocrResult", ocrResult.resultText)
-          const parsed = fastParseFrame(ocrResult.resultText.split('\n'), statsRef.current.dateBest.value);
+          const isStation = det.className === 'station';
+          const parsed = fastParseFrame(ocrResult.resultText.split('\n'), statsRef.current.dateBest.value, isStation);
           console.log("parsed: ", parsed)
           const validClasses = ['code', 'date', 'station'];
           if (parsed && validClasses.includes(det.className)) {
@@ -431,7 +432,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       // Chụp 2 tấm liên tiếp để lấy được tấm nét nhất
       console.log("đc chụp hình rồi đó")
       const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off', enableShutterSound: false });
-      processSubCrops(photo.path, photo.width, photo.height);
+      await processSubCrops(photo.path, photo.width, photo.height);
+      // await processUnionCrop(photo.path, photo.width, photo.height);
     } finally {
       isAutoCapturing.current = false;
     }
@@ -465,7 +467,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     // 1. Kiểm soát điều kiện và tần suất (3-5 FPS là đủ để tracking)
     if (!isScanningActive || model == null) return;
     frameCount.current++;
-    if (frameCount.current % 10 !== 0) return;
+    if (frameCount.current % 5 !== 0) return;
 
     const isPortrait = frame.orientation === 'portrait' || frame.orientation === 'portrait-upside-down';
     const frameActualWidth = isPortrait ? frame.width : frame.height;

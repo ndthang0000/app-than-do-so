@@ -62,7 +62,7 @@ export const decodeYOLOFloat32 = (output: Float32Array): Detection[] => {
   const results: Detection[] = [];
   const rows = 8400; // YOLOv8 640px
   const numClasses = 3;
-  const threshold = 0.1; // Ngưỡng tin cậy
+  const threshold = 0.45; // Ngưỡng tin cậy
 
   for (let i = 0; i < rows; i++) {
     let maxConf = 0;
