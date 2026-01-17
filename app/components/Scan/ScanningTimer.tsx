@@ -12,16 +12,30 @@ interface ScanningTimerProps {
 // Định nghĩa interface cho Ref
 export interface ScanningTimerRef {
   getElapsed: () => number;
+  reset: () => void;
 }
 
 export const ScanningTimer = memo(forwardRef<ScanningTimerRef, ScanningTimerProps>((props, ref) => {
   const { isActive, maxTime, onTimeout, style } = props;
   const [elapsed, setElapsed] = useState(0);
-
   // Expose giá trị elapsed ra cho component cha
   useImperativeHandle(ref, () => ({
     getElapsed: () => elapsed,
+    // Thêm hàm reset nếu cần gọi từ cha
+    reset: () => setElapsed(0)
   }));
+
+  useEffect(() => {
+    if (isActive) {
+      setElapsed(0);
+    }
+  }, [isActive]);
+
+  useEffect(() => {
+    return () => {
+      setElapsed(0); // Dọn dẹp khi component bị gỡ bỏ (unmount)
+    };
+  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;

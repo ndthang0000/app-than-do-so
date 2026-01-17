@@ -21,7 +21,7 @@ import Toast from 'react-native-toast-message';
 import { PhotoRecognizer, useTextRecognition } from 'react-native-vision-camera-ocr-plus';
 import { ScanInfoOverlay } from '@/components/Scan/ScanInfoOverlay';
 import { ScanResult } from '@/constants/lotteryTicket';
-import { fastParseFrame } from '@/utils/fastParseFrame';
+import { fastParseFrame, getCodePenaltyFactor } from '@/utils/fastParseFrame';
 import { ScanningTimer, ScanningTimerRef } from '@/components/Scan/ScanningTimer';
 import { prepareTicketPayload } from '@/utils/ticket-helper';
 import { api } from '@/services/api';
@@ -39,6 +39,10 @@ const topPercent = (topDistance / screenHeight) * 100;
 const leftPercent = 5;
 const widthPercent = 90;
 const heightPercent = (FRAME_HEIGHT / screenHeight) * 100;
+
+const scanRegion = { left: `${leftPercent}%`, top: `${topPercent}%`, width: `${widthPercent}%`, height: `${heightPercent}%` }
+
+
 
 const CONFIDENCE_THRESHOLD = {
   code: 3,
@@ -89,15 +93,21 @@ const toastConfig = {
 };
 
 export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScreen(_props) {
-
   const { navigation } = _props;
   const { themed, theme: { colors, spacing } } = useAppTheme();
-  const timerRef = useRef<ScanningTimerRef>(null);
-  // Camera & Permissions logic
-  const device = useCameraDevice('back');
-  const { hasPermission, requestPermission } = useCameraPermission();
-  const camera = useRef<Camera>(null);
 
+  // Refs
+  const camera = useRef<Camera>(null);
+  const timerRef = useRef<ScanningTimerRef>(null);
+  const statsRef = useRef(createDefaultStats());
+  const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMounted = useRef(true);
+  const frameLayout = useRef({ x: leftDistance, y: topDistance, width: FRAME_WIDTH, height: FRAME_HEIGHT });
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const isStoppingRef = useRef(false);
+  const isTakingPhotoRef = useRef(false);
+
+  // States
   const [shouldRenderCamera, setShouldRenderCamera] = useState(false);
   const [isPermissionGranted, setIsPermissionGranted] = useState(false);
   const [isTimeout, setIsTimeout] = useState(false);
@@ -108,301 +118,161 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const [hasFoundResult, setHasFoundResult] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult>({});
   const [appState, setAppState] = useState(AppState.currentState);
-  const statsRef = useRef(createDefaultStats());
-  const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isCapturingRef = useRef(false); // Tránh việc hàm chụp bị lặp chồng chéo
-  const isTakingPhotoRef = useRef(false);
-  const isStoppingRef = useRef(false);
+
+  // Camera Settings
+  const device = useCameraDevice('back');
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const format = useCameraFormat(device, [{ photoAspectRatio: 4 / 3 }, { videoAspectRatio: 4 / 3 }]);
 
   // 1. TÍNH TOÁN SCAN REGION THEO PHẦN TRĂM Ô MÀU
   // Tọa độ Y bắt đầu của khung quét (nằm giữa màn hình)
-  const startAutoCapture = () => {
+  const startAutoCapture = useCallback(() => {
     if (captureIntervalRef.current || isStoppingRef.current) return;
-    // Immediately capture once, then continue with regular interval
+
     const captureOnce = async () => {
-      if (!isScanningActive || !camera.current || isTakingPhotoRef.current || isProcessing || isStoppingRef.current) {
-        if (!isScanningActive) stopAutoCapture();
-        return;
-      }
+      if (!isScanningActive || !camera.current || isTakingPhotoRef.current || isProcessing || isStoppingRef.current) return;
 
       isTakingPhotoRef.current = true;
       try {
-        const photo = await camera.current.takePhoto({
-          flash: isFlashOn ? 'on' : 'off',
-          enableShutterSound: false,
-        });
-
-        if (isScanningActive && !isStoppingRef.current) {
-          processImageForOCR(photo.path, photo.width, photo.height, true);
+        const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off', enableShutterSound: false });
+        if (isMounted.current && isScanningActive && !isStoppingRef.current) {
+          processImageForOCR(photo.path, photo.width, photo.height);
         }
       } catch (err) {
-        console.error("Lỗi chụp ảnh tự động:", err);
+        console.log("Capture error (Camera potentially closed)", err);
       } finally {
         isTakingPhotoRef.current = false;
       }
-    }
+    };
 
-    // Do the first capture immediately
     captureOnce();
+    captureIntervalRef.current = setInterval(captureOnce, 500);
+  }, [isScanningActive, isFlashOn, isProcessing]);
 
-    // Then schedule repeated captures every 400ms
-    captureIntervalRef.current = setInterval(captureOnce, 200);
+  const stopAutoCapture = () => {
+    isStoppingRef.current = true; // Chặn mọi yêu cầu chụp mới ngay lập tức
+    if (captureIntervalRef.current) {
+      clearInterval(captureIntervalRef.current);
+      captureIntervalRef.current = null;
+      console.log("⏹️ Đã dừng chụp ảnh tự động.");
+    }
   };
 
-  const handleOCR = useRunOnJS((frameData) => {
-    // Xử lý 7 Pipeline của bạn ở đây
-    if (!isScanningActive || hasFoundResult) return;
+  const handleProcessedOCR = useCallback((textData: string, baseWeight: number = 1, fromImage: boolean = false) => {
+    if (!isScanningActive || hasFoundResult || !isMounted.current) return;
 
-
-    const current = fastParseFrame(frameData.split('\n'), statsRef.current?.dateBest?.value);
+    const current = fastParseFrame(textData.split('\n'), statsRef.current?.dateBest?.value, fromImage);
     if (!current) return;
 
-    // LOGIC NÂNG CAO: Chống nhầm lẫn mmyyyy
+    // Chống nhầm lẫn số vé và ngày tháng
     if (current.code && current.date) {
-      const dateNumbers = current.date.replace(/[^0-9]/g, ''); // Ví dụ: 12052024
-
-      // Nếu mã vé giống hệt 6 số cuối của ngày (052024) hoặc 6 số đầu (120520)
-      // thì khả năng cao là detect nhầm ngày tháng
-      if (dateNumbers.includes(current.code)) {
-        return;
-      }
+      const dateNums = current.date.replace(/[^0-9]/g, '');
+      if (dateNums.includes(current.code)) return;
     }
 
-    // 1. Cập nhật kho dữ liệu (Thêm vào chứ không đè)
+    let needsUpdateUI = false;
     const keys = ['code', 'station', 'date'] as const;
 
     keys.forEach(key => {
       const val = current[key];
       if (!val) return;
 
-      // Tăng đếm tần suất
-      const statsKey = key === 'code' ? 'codes' : key === 'station' ? 'stations' : 'dates';
-      statsRef.current[statsKey][val] = (statsRef.current[statsKey][val] || 0) + 1;
+      let finalWeight = baseWeight;
 
-      // 2. TÌM GIÁ TRỊ TỐT NHẤT TRONG KHO
-      // const bestMatch = getMostFrequent(statsRef.current[statsKey]);
+      // CHỈ ÁP DỤNG PHẠT CHO "CODE" (MÃ VÉ)
+      if (key === 'code') {
+        const penalty = getCodePenaltyFactor(val, statsRef.current.dateBest.value);
+        finalWeight = baseWeight * penalty;
+
+        // Nếu điểm sau phạt quá thấp (ví dụ < 0.5), ta có thể log để debug
+        if (penalty < 1) {
+          console.log(`⚠️ Code ${val} bị phạt hệ số ${penalty}. Điểm cộng: ${finalWeight}`);
+        }
+      }
+
+      const statsKey = key === 'code' ? 'codes' : key === 'station' ? 'stations' : 'dates';
+      statsRef.current[statsKey][val] = (statsRef.current[statsKey][val] || 0) + finalWeight;
+
       if (statsRef.current[statsKey][val] > statsRef.current[`${key}Best`].freq) {
+        needsUpdateUI = true;
         statsRef.current[`${key}Best`] = { value: val, freq: statsRef.current[statsKey][val] };
       }
-
-      // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
-      // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
-      if (statsRef.current[`${key}Best`].freq >= CONFIDENCE_THRESHOLD[key]) {
-        setScanResult(prev => {
-          // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
-          if (prev[key] !== statsRef.current[`${key}Best`].value) {
-            return { ...prev, [key]: statsRef.current[`${key}Best`].value };
-          }
-          return prev;
-        });
-      }
     });
-
-    if (!captureIntervalRef.current && isScanningActive && !hasFoundResult) {
-      console.log("🚀 bắt đầu chế độ chụp ảnh 0.3s/lần");
-      startAutoCapture();
+    if (needsUpdateUI) {
+      setScanResult({
+        code: statsRef.current.codeBest.freq >= CONFIDENCE_THRESHOLD.code ? statsRef.current.codeBest.value : scanResult.code,
+        station: statsRef.current.stationBest.freq >= CONFIDENCE_THRESHOLD.station ? statsRef.current.stationBest.value : scanResult.station,
+        date: statsRef.current.dateBest.freq >= CONFIDENCE_THRESHOLD.date ? statsRef.current.dateBest.value : scanResult.date,
+      });
     }
 
     const isFullyCaptured =
       statsRef.current.codeBest.freq >= DETERMINE_THRESHOLD.code &&
       statsRef.current.stationBest.freq >= DETERMINE_THRESHOLD.station &&
       statsRef.current.dateBest.freq >= DETERMINE_THRESHOLD.date;
-    if (isFullyCaptured) {
-      setIsScanningActive(false);
+
+    if (isFullyCaptured && !hasFoundResult) {
       setHasFoundResult(true);
+      setIsScanningActive(false);
       stopAutoCapture();
     }
+  }, [isScanningActive, hasFoundResult, stopAutoCapture]);
 
-  }, [isScanningActive, isCapturingRef, hasFoundResult]);
+  const onFrameOCR = useRunOnJS((text: string) => {
+    handleProcessedOCR(text, 1);
+    if (!captureIntervalRef.current && isScanningActive && !hasFoundResult) {
+      startAutoCapture();
+    }
+  }, [handleProcessedOCR, isScanningActive, hasFoundResult, startAutoCapture]);
+
 
   const { scanText } = useTextRecognition({
     language: 'latin',
-    frameSkipThreshold: 10,
-    useLightweightMode: true,
-    scanRegion: {
-      left: `${leftPercent}%`,
-      top: `${topPercent}%`,
-      width: `${widthPercent}%`,
-      height: `${heightPercent}%`
-    }
+    frameSkipThreshold: 12,
+    scanRegion: scanRegion as any,
   });
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     if (!isScanningActive || hasFoundResult) return;
     const data = scanText(frame);
-    if (data && data.resultText) {
-      handleOCR(data.resultText);
-    }
-  }, [isScanningActive]);
+    if (data?.resultText) onFrameOCR(data.resultText);
+  }, [isScanningActive, hasFoundResult]);
 
-  const scanLineAnim = useRef(new Animated.Value(0)).current;
   // Thêm useRef để lưu tọa độ thực tế của khung quét
-  const frameLayout = useRef({
-    x: (screenWidth - FRAME_WIDTH) / 2,
-    y: (screenHeight - FRAME_HEIGHT) / 2,
-    width: FRAME_WIDTH,
-    height: FRAME_HEIGHT
-  });
 
   const containerRef = useRef<View>(null);
 
-  const format = useCameraFormat(device, [
-    { photoAspectRatio: 4 / 3 },
-    { videoAspectRatio: 4 / 3 }
-  ])
-
-  const processImageForOCR = async (uri: string, photoWidth: number, photoHeight: number, shouldCrop: boolean = true) => {
-    if (isProcessing) return;
+  const processImageForOCR = async (uri: string, pW: number, pH: number, shouldCrop = true) => {
+    if (isProcessing || !isMounted.current || isStoppingRef.current) return;
     setIsProcessing(true);
     try {
       let finalUri = uri;
-
       if (shouldCrop) {
-        // 1. Tính toán kích thước ảnh hiển thị trong mode "contain"
-        const screenAspectRatio = screenWidth / screenHeight;
-        const photoAspectRatio = photoWidth / photoHeight;
+        const scale = screenWidth / pW;
+        const { x, y, width, height } = frameLayout.current;
+        const offsetY = (screenHeight - (screenWidth * pH / pW)) / 2;
 
-        let renderWidth, renderHeight, offsetX, offsetY;
-
-        if (photoAspectRatio > screenAspectRatio) {
-          // Ảnh bị dải đen trên/dưới
-          renderWidth = screenWidth;
-          renderHeight = screenWidth / photoAspectRatio;
-          offsetX = 0;
-          offsetY = (screenHeight - renderHeight) / 2;
-        } else {
-          // Ảnh bị dải đen trái/phải
-          renderHeight = screenHeight;
-          renderWidth = screenHeight * photoAspectRatio;
-          offsetY = 0;
-          offsetX = (screenWidth - renderWidth) / 2;
-        }
-
-
-        // 2. Tính Scale giữa ảnh gốc và vùng hiển thị thực tế
-        const scale = renderWidth / photoWidth;
-
-        // 3. Tọa độ khung quét trên màn hình
-        const { x: fX, y: fY, width: fW, height: fH } = frameLayout.current;
-
-        // 2. TÍNH TOÁN VÙNG ĐỆM (PADDING) - Thêm 15% diện tích
-        const paddingX = fW * 0.05;
-        const paddingY = fH * 0.05;
-        // Mở rộng tọa độ nhưng đảm bảo không vượt quá biên màn hình
-        const paddedX = Math.max(offsetX, fX - paddingX);
-        const paddedY = Math.max(offsetY, fY - paddingY);
-        const paddedW = Math.min(renderWidth, fW + (paddingX * 2));
-        const paddedH = Math.min(renderHeight, fH + (paddingY * 2));
-        // 4. CHUYỂN ĐỔI TỌA ĐỘ SANG ẢNH GỐC
-        // Ta lấy tọa độ khung hình trừ đi dải đen (offset) rồi mới chia cho scale
-        // 3. CHUYỂN ĐỔI SANG TỌA ĐỘ ẢNH GỐC
-        const actualOriginX = (paddedX - offsetX) / scale;
-        const actualOriginY = (paddedY - offsetY) / scale;
-        const actualWidth = paddedW / scale;
-        const actualHeight = paddedH / scale;
-
-        if (actualWidth > 0 && actualHeight > 0) {
-          const manipulatedImage = await ImageManipulator.manipulateAsync(
-            uri,
-            [
-              {
-                crop: {
-                  originX: Math.max(0, actualOriginX),
-                  originY: Math.max(0, actualOriginY),
-                  width: Math.min(photoWidth - actualOriginX, actualWidth),
-                  height: Math.min(photoHeight - actualOriginY, actualHeight),
-                },
-              },
-              { resize: { width: 1200 } },
-            ],
-            { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
-          );
-          finalUri = manipulatedImage.uri;
-          // await MediaLibrary.saveToLibraryAsync(finalUri);
-          // const cleanedUri = await cleanImageForOCR(finalUri, 0, 0, manipulatedImage.width, manipulatedImage.height)
-          // finalUri = cleanedUri;
-          // save to gallery for testing
-          // await MediaLibrary.saveToLibraryAsync(finalUri);
-        }
-      } else {
-        // NẾU LÀ ẢNH TỪ GALLERY (ĐÃ CROP TAY)
-        // Chỉ cần resize nhẹ và grayscale để tăng độ chính xác OCR
-        const optimizedImage = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: 1024 } }],
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        finalUri = optimizedImage.uri;
-        // const cleanedUri = await cleanImageForOCR(finalUri, 0, 0, optimizedImage.width, optimizedImage.height)
-        // finalUri = cleanedUri;
-        // // save to gallery for testing
-        // await MediaLibrary.saveToLibraryAsync(finalUri);
-      }
-
-
-
-      // await Sharing.shareAsync(finalUri);
-      const result = await PhotoRecognizer({ uri: finalUri });
-      console.log("Kết quả OCR Ảnh:", result.resultText);
-      if (!result || !result.resultText) {
-        return;
-      }
-      const current = fastParseFrame(result.resultText.split('\n'), scanResult?.date, true);
-      if (!current) return;
-      // LOGIC NÂNG CAO: Chống nhầm lẫn mmyyyy
-      if (current.code && current.date) {
-        const dateNumbers = current.date.replace(/[^0-9]/g, ''); // Ví dụ: 12052024
-
-        // Nếu mã vé giống hệt 6 số cuối của ngày (052024) hoặc 6 số đầu (120520)
-        // thì khả năng cao là detect nhầm ngày tháng
-        if (dateNumbers.includes(current.code)) {
-          return;
-        }
-      }
-
-      // 1. Cập nhật kho dữ liệu (Thêm vào chứ không đè)
-      const keys = ['code', 'station', 'date'] as const;
-
-      keys.forEach(key => {
-        const val = current[key];
-        if (!val) return;
-
-        // Tăng đếm tần suất
-        const statsKey = key === 'code' ? 'codes' : key === 'station' ? 'stations' : 'dates';
-        statsRef.current[statsKey][val] = (statsRef.current[statsKey][val] || 0) + 5; // 5 điểm cho ảnh chụp
-        if (statsRef.current[statsKey][val] > statsRef.current[`${key}Best`].freq) {
-          statsRef.current[`${key}Best`] = { value: val, freq: statsRef.current[statsKey][val] };
-        }
-
-
-        // 3. CẬP NHẬT UI NẾU ĐẠT NGƯỠNG
-        // Chỉ cập nhật nếu giá trị mới này có tần suất đủ lớn (Confidence)
-        if (statsRef.current[`${key}Best`].freq >= CONFIDENCE_THRESHOLD[key]) {
-          setScanResult(prev => {
-            // Nếu giá trị tốt nhất trong kho khác với giá trị đang hiển thị trên UI thì mới update
-            if (prev[key] !== statsRef.current[`${key}Best`].value) {
-              return { ...prev, [key]: statsRef.current[`${key}Best`].value };
+        const crop = await ImageManipulator.manipulateAsync(uri, [
+          {
+            crop: {
+              originX: Math.max(0, x / scale),
+              originY: Math.max(0, (y - offsetY) / scale),
+              width: width / scale,
+              height: height / scale
             }
-            return prev;
-          });
-        }
+          },
+          { resize: { width: 1000 } }
+        ], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
+        finalUri = crop.uri;
+      }
 
-        const isFullyCaptured =
-          statsRef.current.codeBest.freq >= DETERMINE_THRESHOLD.code &&
-          statsRef.current.stationBest.freq >= DETERMINE_THRESHOLD.station &&
-          statsRef.current.dateBest.freq >= DETERMINE_THRESHOLD.date;
-
-        if (isFullyCaptured) {
-          setIsScanningActive(false);
-          setHasFoundResult(true);
-          stopAutoCapture();
-        }
-      });
-
-
-    } catch (error) {
-      console.error("Lỗi OCR:", error);
+      const result = await PhotoRecognizer({ uri: finalUri });
+      if (result?.resultText) {
+        handleProcessedOCR(result.resultText, 5, true); // Tặng 5 điểm tin cậy cho ảnh chụp
+      }
+    } catch (e) {
+      console.error("OCR Photo Error:", e);
     } finally {
       setIsProcessing(false);
     }
@@ -437,135 +307,107 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   }
 
-  const handleTimeout = useCallback(() => {
-    setIsTimeout(true);
-  }, []);
-
-  const stopAutoCapture = () => {
-    isStoppingRef.current = true; // Chặn mọi yêu cầu chụp mới ngay lập tức
-    if (captureIntervalRef.current) {
-      clearInterval(captureIntervalRef.current);
-      captureIntervalRef.current = null;
-      console.log("⏹️ Đã dừng chụp ảnh tự động.");
-    }
-  };
 
   const toggleScanning = () => {
     if (isScanningActive) {
       stopAutoCapture();
     } else {
-      isStoppingRef.current = false; // Mở lại khi bắt đầu scan mới
+      isStoppingRef.current = false;
+      setScanResult({});
+      statsRef.current = createDefaultStats();
+      setHasFoundResult(false);
     }
     setIsScanningActive(!isScanningActive);
-    setHasFoundResult(false);
-    setScanResult({}); // Reset kết quả khi scan lại
-    statsRef.current = createDefaultStats(); // Reset kho dữ liệu
   };
 
+  const handleTimeout = useCallback(() => setIsTimeout(true), [])
 
   useEffect(() => {
-    const checkPermission = async () => {
-      if (!hasPermission) {
-        const status = await requestPermission();
-        setIsPermissionGranted(status);
-      } else {
-        setIsPermissionGranted(true);
-      }
-    };
+    isMounted.current = true;
+    requestPermission().then(setIsPermissionGranted);
 
-    checkPermission();
+    Animated.loop(Animated.sequence([
+      Animated.timing(scanLineAnim, { toValue: FRAME_HEIGHT - 4, duration: 2000, useNativeDriver: true }),
+      Animated.timing(scanLineAnim, { toValue: 0, duration: 2000, useNativeDriver: true }),
+    ])).start();
 
-    // Animation giữ nguyên
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scanLineAnim, {
-          toValue: FRAME_HEIGHT - 4,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scanLineAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [hasPermission]);
-
-  useEffect(() => {
-    // 1. Khi màn hình thực sự hiện ra trước mắt người dùng
-
-    const unsubscribeFocus = navigation.addListener('focus', () => {
-      setIsScanningActive(false); // Reset state luôn tại đây
-      statsRef.current = createDefaultStats();
-      setScanResult({});
-      setShouldRenderCamera(true);
-    });
-
-    // 2. Khi màn hình bị che đi hoặc người dùng thoát ra
-    const unsubscribeBlur = navigation.addListener('blur', () => {
-      setIsFlashOn(false);
-      setIsScanningActive(false);
-      setShouldRenderCamera(false);
-      statsRef.current = createDefaultStats();
-      setScanResult({});
-    });
-
-    const unSubscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      setAppState(nextAppState);
-    });
-
-    // Cleanup khi component bị hủy hẳn
+    const sub = AppState.addEventListener('change', (state) => setAppState(state));
     return () => {
-      unsubscribeFocus();
-      unsubscribeBlur();
-      unSubscription.remove();
+      isMounted.current = false;
+      sub.remove();
+      stopAutoCapture();
     };
-  }, [navigation]);
+  }, []);
 
   useEffect(() => {
-    async function callAPICheckTicket() {
-      if (hasFoundResult && scanResult.code && scanResult.station && scanResult.date) {
-        const duration = timerRef.current?.getElapsed() || 0;
+    const focusSub = navigation.addListener('focus', () => {
+      setShouldRenderCamera(true);
+      setIsScanningActive(false);
+      setHasFoundResult(false);
+      isStoppingRef.current = false;
+      setScanResult({});
+      statsRef.current = createDefaultStats();
+    });
+    const blurSub = navigation.addListener('blur', () => {
+      setShouldRenderCamera(false);
+      stopAutoCapture();
+    });
+    return () => { focusSub(); blurSub(); };
+  }, [navigation, stopAutoCapture]);
 
-        const payload = prepareTicketPayload(scanResult, duration);
-        console.log("🚀 Payload gửi đi:", payload);
-
-        // Gọi API check-and-save của bạn ở đây
+  useEffect(() => {
+    if (hasFoundResult && scanResult.code && scanResult.station && scanResult.date) {
+      const finalizeScan = async () => {
+        stopAutoCapture();
+        setShouldRenderCamera(false);
         setIsLoading(true);
+
+        const payload = prepareTicketPayload(scanResult, timerRef.current?.getElapsed() || 0);
+        console.log('Payload send: ', JSON.stringify(payload))
         const response = await api.checkAndSave(payload);
+
         setIsLoading(false);
-        setHasFoundResult(false);
-        if (response.kind === 'ok') {
-          navigation.navigate('TicketDetail', { ticketId: response?.data?.data?.ticket?._id, source: 'scan' });
+        if (response.kind === 'ok' && isMounted.current) {
+          setTimeout(() => {
+            navigation.navigate('TicketDetail', { ticketId: response.data?.data?.ticket?._id, source: 'scan' });
+          }, 200);
         } else {
-          // xử lý lỗi
           Toast.show({
-            type: 'error',
-            text1: `  ❌ Lỗi: ${response.kind || 'Không thể kết nối đến máy chủ'}`,
+            type: 'info',
+            text1: `❌ Lỗi: đọc vé số không thành công. Vui lòng đưa vé vào sát khung hình và thử lại!`,
             position: 'bottom',
             bottomOffset: 150,
             visibilityTime: 700,
           });
+          setShouldRenderCamera(true);
+          setHasFoundResult(false);
+          setIsScanningActive(true);
+          statsRef.current = createDefaultStats();
+          setScanResult({});
         }
-      }
+      };
+      finalizeScan();
     }
-    callAPICheckTicket();
   }, [hasFoundResult]);
 
   useEffect(() => {
-    if (isTimeout) {
-      // Dừng mọi tiến trình trước khi đi
+    if (isTimeout && isMounted.current) {
+      // 1. Dừng mọi tác vụ ngầm
       stopAutoCapture();
-      setIsScanningActive(false);
 
-      // Navigate sau khi kết thúc chu kỳ render
-      navigation.navigate("ErrorOCR");
+    // 2. Sử dụng setTimeout để đẩy lệnh navigate ra khỏi chu kỳ render hiện tại
+    // Việc này giúp tránh lỗi "Cannot update a component while rendering another"
+    const timeoutId = setTimeout(() => {
+      if (isMounted.current) {
+        setShouldRenderCamera(false);
+        setIsTimeout(false); // Reset state an toàn
+        navigation.navigate("ErrorOCR");
+      }
+    }, 0);
 
-      // Reset lại để tránh quay lại màn hình bị lặp lại logic
-      setIsTimeout(false);
-    }
-  }, [isTimeout]);
+    return () => clearTimeout(timeoutId);
+  }
+  }, [isTimeout, navigation, stopAutoCapture]);
 
   // Dọn dẹp khi unmount component hoặc khi tắt scan tay
   useEffect(() => {
@@ -577,7 +419,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     return (
       <View style={themed($container)}>
         <Text text="Ứng dụng cần quyền Camera để quét vé số" />
-
       </View>
     );
   }
@@ -630,15 +471,17 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             </TouchableOpacity>
           }
         />
-        <ScanInfoOverlay isVisible={(isScanningActive || hasFoundResult)} data={scanResult} />
+        <ScanInfoOverlay isVisible={isScanningActive || hasFoundResult} data={scanResult} />
+        {isScanningActive && !hasFoundResult && (
+          <ScanningTimer
+            ref={timerRef}
+            isActive={isScanningActive}
+            maxTime={10}
+            onTimeout={handleTimeout}
+            style={themed($scanTimerWrapper)}
+          />
+        )}
 
-        <ScanningTimer
-          ref={timerRef}
-          isActive={isScanningActive}
-          maxTime={10}
-          onTimeout={handleTimeout}
-          style={themed($scanTimerWrapper)}
-        />
 
 
 

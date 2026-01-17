@@ -224,3 +224,43 @@ export const fastParseFrame = (lines: string[], currentDate: string | undefined,
 
   return result
 };
+
+export const getCodePenaltyFactor = (code: string, dateStr?: string) => {
+  if (!code) return 1;
+
+  // 1. Tạo các mốc ngày tháng để so sánh (Hôm nay, Hôm qua, Ngày mai)
+  const today = new Date();
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+
+  const formatDate = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(d.getFullYear());
+    const yy = yyyy.slice(-2);
+    return { ddmmyy: `${dd}${mm}${yy}`, mmyyyy: `${mm}${yyyy}`, ddmmyyyy: `${dd}${mm}${yyyy}` };
+  };
+
+  const datesToCheck = [formatDate(today), formatDate(yesterday), formatDate(tomorrow)];
+
+  // KIỂM TRA CÁC QUY TẮC PHẠT
+
+  // Quy tắc 1: Code giống ddmmyy hoặc mmyyyy của các ngày lân cận (Phạt nặng 0.3)
+  const isLikelyDate = datesToCheck.some(d => d.ddmmyy === code || d.mmyyyy === code);
+  if (isLikelyDate) return 0.3;
+
+  // Quy tắc 2: Code chứa năm hiện tại (Ví dụ 2026) (Phạt 0.6)
+  if (code.includes(new Date().getFullYear().toString())) return 0.6;
+
+  // Quy tắc 3: Code chứa quá nhiều số 0 (Dấu hiệu của lỗi OCR hoặc vùng trống)
+  if (code.includes("00000")) return 0.4;
+  if (code.includes("0000")) return 0.7;
+
+  // Quy tắc 4: Chống nhầm lẫn với chuỗi date đang hiển thị
+  if (dateStr) {
+    const cleanDate = dateStr.replace(/[^0-9]/g, '');
+    if (cleanDate.includes(code)) return 0.3;
+  }
+
+  return 1; // Không vi phạm -> Giữ nguyên điểm
+};

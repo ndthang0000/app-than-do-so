@@ -9,57 +9,59 @@ import * as FileSystem from 'expo-file-system/legacy'
  */
 export const cleanImageForOCR = async (uri: string, x: number, y: number, w: number, h: number) => {
   try {
-    const fileContent = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' })
-    const data = Skia.Data.fromBase64(fileContent)
-    const image = Skia.Image.MakeImageFromEncoded(data)
+    const fileContent = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+    const data = Skia.Data.fromBase64(fileContent);
+    const image = Skia.Image.MakeImageFromEncoded(data);
 
-    if (!image) return uri
+    if (!image) return uri;
 
-    // CHỈNH SỬA TẠI ĐÂY: 
-    // Chúng ta muốn ảnh kết quả có chiều ngang là 1000px để OCR nét hơn
-    const OUTPUT_WIDTH = 1000;
+    const OUTPUT_WIDTH = 1200;
     const OUTPUT_HEIGHT = (h / w) * OUTPUT_WIDTH;
 
-    // Surface phải khớp hoàn toàn với kích thước chúng ta định vẽ
-    const surface = Skia.Surface.Make(OUTPUT_WIDTH, OUTPUT_HEIGHT)!
-    const canvas = surface.getCanvas()
+    const surface = Skia.Surface.Make(OUTPUT_WIDTH, OUTPUT_HEIGHT)!;
+    const canvas = surface.getCanvas();
 
-    const r = 0.299;
-    const g = 0.587;
-    const b = 0.114;
+    /**
+     * CHIẾN THUẬT MỚI:
+     * 1. Tăng tương phản vừa phải (Contrast: 1.5 - 1.8)
+     * 2. Dìm độ sáng xuống một chút (Brightness: -0.1 đến -0.2) để không bị trắng xóa
+     * 3. Sử dụng trọng số Grayscale chuẩn để giữ chi tiết
+     */
+    const contrast = 1.8;
+    const brightness = -0.2;
+    const r = 0.2126 * contrast;
+    const g = 0.7152 * contrast;
+    const b = 0.0722 * contrast;
 
-    // Hệ số điều chỉnh nhẹ nhàng hơn
-    const contrast = 1.4;  // Chỉ tăng 40% thay vì 400%
-    const brightness = 0.05; // Tăng sáng nhẹ thay vì dìm tối
-
-    const balancedMatrix = [
-      r * contrast, g * contrast, b * contrast, 0, brightness,
-      r * contrast, g * contrast, b * contrast, 0, brightness,
-      r * contrast, g * contrast, b * contrast, 0, brightness,
+    const safeMatrix = [
+      r, g, b, 0, brightness,
+      r, g, b, 0, brightness,
+      r, g, b, 0, brightness,
       0, 0, 0, 1, 0,
     ];
 
+    const paint = Skia.Paint();
+    paint.setColorFilter(Skia.ColorFilter.MakeMatrix(safeMatrix));
 
-    const paint = Skia.Paint()
-    paint.setColorFilter(Skia.ColorFilter.MakeMatrix(balancedMatrix))
+    // Vẽ nền xám nhẹ để kiểm tra nếu ảnh bị mất (optional)
+    canvas.drawColor(Skia.Color('white'));
 
-    // Vẽ tràn toàn bộ Surface mới
-    const destRect = Skia.XYWHRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT)
-    const sourceRect = Skia.XYWHRect(x, y, w, h)
+    const destRect = Skia.XYWHRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+    const sourceRect = Skia.XYWHRect(x, y, w, h);
 
-    canvas.drawImageRect(image, sourceRect, destRect, paint)
+    canvas.drawImageRect(image, sourceRect, destRect, paint);
 
-    const snapshot = surface.makeImageSnapshot()
-    const processedBase64 = snapshot.encodeToBase64(ImageFormat.JPEG, 90)
+    const snapshot = surface.makeImageSnapshot();
+    const processedBase64 = snapshot.encodeToBase64(ImageFormat.JPEG, 90);
 
-    const cacheDir = (FileSystem as any).cacheDirectory ?? (FileSystem as any).documentDirectory ?? ''
-    const newPath = `${cacheDir}ocr_clean_${Date.now()}.jpg`
+    const cacheDir = FileSystem.cacheDirectory ?? '';
+    const newPath = `${cacheDir}ocr_clean_${Date.now()}.jpg`;
 
-    await FileSystem.writeAsStringAsync(newPath, processedBase64, { encoding: 'base64' })
+    await FileSystem.writeAsStringAsync(newPath, processedBase64, { encoding: 'base64' });
 
-    return newPath
+    return newPath;
   } catch (e) {
-    console.error("Skia Error:", e)
-    return uri
+    console.error("Skia Error:", e);
+    return uri;
   }
-}
+};
