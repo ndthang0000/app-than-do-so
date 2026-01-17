@@ -6,12 +6,9 @@ import { distance } from 'fastest-levenshtein';
 const cleanForFuzzy = (text: string) => {
   'worklet';
   return text
-    .toUpperCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Xóa dấu
-    .replace(/[^A-Z]/g, ''); // Chỉ giữ lại chữ cái
+    .replace(/[\u0300-\u036f]|[^A-Z0-9]/g, ''); // Xóa dấu và ký tự đặc biệt cùng lúc
 };
-
 // Hàm tính độ tương đồng (0 đến 1)
 const getSimilarity = (str1: string, str2: string) => {
   const maxLength = Math.max(str1.length, str2.length);
@@ -33,7 +30,9 @@ export const findStationWithLevenshtein = (lines: string[], dateStr?: string): s
   const dayOfWeek = days[getDay(parsedDate)];
 
   let candidateProvinces = LOTTERY_SCHEDULE.reduce((acc, region) => {
+    if (region.region === "north") return acc; // Bỏ qua miền Bắc vì quá nhiều đài
     const daily = region.schedule.find(s => s.date === dayOfWeek);
+
     return daily ? [...acc, ...daily.provinces] : acc;
   }, [] as string[]);
   candidateProvinces.push("Miền Bắc"); // Các đài phổ biến/đặc thù
@@ -41,26 +40,20 @@ export const findStationWithLevenshtein = (lines: string[], dateStr?: string): s
   let bestMatch = { province: '', score: 0 };
   const SIMILARITY_THRESHOLD = 0.65; // Độ chính xác trên 65% thì mới chấp nhận
 
-  for (const line of lines) {
-    const cleanedLine = cleanForFuzzy(line);
-    if (cleanedLine.length < 4) continue; // Bỏ qua rác quá ngắn
+  const cleanedLines = lines.map(l => cleanForFuzzy(l)).filter(l => l.length >= 3);
+  for (const province of candidateProvinces) {
+    const target = cleanForFuzzy(province);
+    const keywords = (FUZZY_PROVINCE_KEYWORDS[province] || [province]).map(k => cleanForFuzzy(k));
 
-    for (const province of candidateProvinces) {
-      // Tên tỉnh mục tiêu đã dọn dẹp (ví dụ: "BINHDUONG")
-      const target = cleanForFuzzy(province);
+    for (const line of cleanedLines) {
+      // Cách 1: Keyword match (Cực nhanh)
+      if (keywords.some(kw => line.includes(kw))) return province;
 
-      // Cách 1: Thử khớp bằng Regex (Nhanh và chính xác cho text sạch)
-      const keywords = FUZZY_PROVINCE_KEYWORDS[province];
-      if (keywords && keywords.some(keyword => cleanedLine.includes(cleanForFuzzy(keyword)))) {
-        return province;
-      }
-
-      // Cách 2: Nếu Regex trượt, dùng Levenshtein cho text "rác"
-      // Chúng ta trích xuất một đoạn con trong cleanedLine có độ dài tương đương target để so sánh
-      // hoặc so sánh trực tiếp nếu cleanedLine chứa các ký tự của target
-      const score = getSimilarity(cleanedLine, target);
+      // Cách 2: Levenshtein (Dành cho chữ bị bể nét)
+      const score = getSimilarity(line, target);
       if (score > bestMatch.score) {
         bestMatch = { province, score };
+        if (score > 0.9) return province; // Tìm thấy đài quá giống -> Thoát luôn
       }
     }
   }
@@ -175,56 +168,6 @@ const findStationWithSchedule = (lines: string[], dateStr?: string): string | un
   return bestGlobalMatch.score >= MIN_SIMILARITY ? bestGlobalMatch.province : undefined;
 };
 
-export const fastParseFrame = (lines: string[], currentDate: string | undefined, isImage: boolean = false): ScanResult | null => {
-  'worklet';
-  let result: ScanResult = {};
-
-  // Duyệt qua các dòng text (ML Kit trả về mảng các dòng là tốt nhất)
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].toUpperCase();
-
-    // 1. Tìm CODE (Ưu tiên số 1 vì nó là linh hồn của vé số)
-    if (!result.code && isLotteryCode(line)) {
-      result.code = line.replace(/[^0-9]/g, '').slice(0, 6);
-    }
-
-
-    // 2. Tìm NGÀY (Regex tối giản chỉ tìm định dạng dd-mm-yyyy)
-    if (!result.date) {
-      // 1. Chuẩn hóa dòng: Thay thế mọi ký tự phân cách (space, dot, slash) thành dấu gạch ngang
-      // Ví dụ: "02 - 1 / 2026" -> "02---1-/-2026"
-      // Sau đó xóa bỏ khoảng trắng thừa
-      const normalized = line.replace(/\s+/g, '').replace(/[./]/g, '-');
-
-      // 2. Regex siêu linh hoạt
-      // Nhóm 1 (\d{1,2}): Ngày (1 hoặc 2 số)
-      // Ký tự phân cách [-]* : Cho phép nhiều dấu gạch ngang liên tiếp (do kết quả replace ở trên)
-      // Nhóm 2 (\d{1,2}): Tháng (1 hoặc 2 số)
-      // Nhóm 3 (202[4-6]): Năm
-      const flexibleMatch = normalized.match(/(\d{1,2})-*(\d{1,2})-*(202[4-6])/);
-
-      if (flexibleMatch) {
-        const [_, dStr, mStr, yStr] = flexibleMatch;
-
-        // 3. Chuẩn hóa về định dạng dd-mm-yyyy (Thêm số 0 nếu thiếu)
-        const day = dStr.padStart(2, '0');
-        const month = mStr.padStart(2, '0');
-        const potentialDate = `${day}-${month}-${yStr}`;
-
-        if (isValidLotteryDate(potentialDate)) {
-          result.date = potentialDate;
-        }
-      }
-    }
-    if (isImage) {
-      result.station = findStationWithLevenshtein(lines, result.date || currentDate);
-    }
-    // Nếu đã đủ 3 thông tin chính thì thoát sớm để tiết kiệm CPU
-  }
-
-  return result
-};
-
 export const getCodePenaltyFactor = (code: string, dateStr?: string) => {
   if (!code) return 1;
 
@@ -263,4 +206,57 @@ export const getCodePenaltyFactor = (code: string, dateStr?: string) => {
   }
 
   return 1; // Không vi phạm -> Giữ nguyên điểm
+};
+
+export const fastParseFrame = (lines: string[], currentDate: string | undefined, isImage: boolean = false): ScanResult | null => {
+  'worklet';
+  let result: ScanResult = {};
+  let bestCode = { value: '', score: 0 }
+  // Duyệt qua các dòng text (ML Kit trả về mảng các dòng là tốt nhất)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]; // ĐÃ UPPERCASE TẠI CALLER
+
+
+    // 2. Tìm NGÀY (Regex tối giản chỉ tìm định dạng dd-mm-yyyy)
+    if (!result.date) {
+      // 1. Chuẩn hóa dòng: Thay thế mọi ký tự phân cách (space, dot, slash) thành dấu gạch ngang
+      // Ví dụ: "02 - 1 / 2026" -> "02---1-/-2026"
+      // Sau đó xóa bỏ khoảng trắng thừa
+      const normalized = line.replace(/\s+/g, '').replace(/[./]/g, '-');
+
+      // 2. Regex siêu linh hoạt
+      // Nhóm 1 (\d{1,2}): Ngày (1 hoặc 2 số)
+      // Ký tự phân cách [-]* : Cho phép nhiều dấu gạch ngang liên tiếp (do kết quả replace ở trên)
+      // Nhóm 2 (\d{1,2}): Tháng (1 hoặc 2 số)
+      // Nhóm 3 (202[4-6]): Năm
+      const flexibleMatch = normalized.match(/(\d{1,2})-*(\d{1,2})-*(202[4-6])/);
+
+      if (flexibleMatch) {
+        const [_, dStr, mStr, yStr] = flexibleMatch;
+
+        // 3. Chuẩn hóa về định dạng dd-mm-yyyy (Thêm số 0 nếu thiếu)
+        const day = dStr.padStart(2, '0');
+        const month = mStr.padStart(2, '0');
+        const potentialDate = `${day}-${month}-${yStr}`;
+
+        if (isValidLotteryDate(potentialDate)) {
+          result.date = potentialDate;
+        }
+      }
+    }
+    if (isImage) {
+      result.station = findStationWithLevenshtein(lines, result.date || currentDate);
+    }
+
+    if (!result.code && isLotteryCode(line) && bestCode.score < 1) {
+      result.code = line.replace(/[^0-9]/g, '').slice(-6); // Lấy đúng 6 chữ số cuối
+      const score = getCodePenaltyFactor(result.code, result.date || currentDate);
+      if (score > bestCode.score) {
+        bestCode = { value: result.code, score };
+      }
+    }
+    // Nếu đã đủ 3 thông tin chính thì thoát sớm để tiết kiệm CPU
+  }
+
+  return result
 };

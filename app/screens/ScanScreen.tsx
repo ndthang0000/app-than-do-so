@@ -134,7 +134,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
 
       isTakingPhotoRef.current = true;
       try {
-        const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off', enableShutterSound: false });
+        const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off', enableShutterSound: false, });
         if (isMounted.current && isScanningActive && !isStoppingRef.current) {
           processImageForOCR(photo.path, photo.width, photo.height);
         }
@@ -144,8 +144,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         isTakingPhotoRef.current = false;
       }
     };
-
     captureOnce();
+
     captureIntervalRef.current = setInterval(captureOnce, 500);
   }, [isScanningActive, isFlashOn, isProcessing]);
 
@@ -161,14 +161,8 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const handleProcessedOCR = useCallback((textData: string, baseWeight: number = 1, fromImage: boolean = false) => {
     if (!isScanningActive || hasFoundResult || !isMounted.current) return;
 
-    const current = fastParseFrame(textData.split('\n'), statsRef.current?.dateBest?.value, fromImage);
+    const current = fastParseFrame(textData.toUpperCase()?.split('\n'), statsRef.current?.dateBest?.value, fromImage);
     if (!current) return;
-
-    // Chống nhầm lẫn số vé và ngày tháng
-    if (current.code && current.date) {
-      const dateNums = current.date.replace(/[^0-9]/g, '');
-      if (dateNums.includes(current.code)) return;
-    }
 
     let needsUpdateUI = false;
     const keys = ['code', 'station', 'date'] as const;
@@ -347,6 +341,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       isStoppingRef.current = false;
       setScanResult({});
       statsRef.current = createDefaultStats();
+      setIsFlashOn(false);
     });
     const blurSub = navigation.addListener('blur', () => {
       setShouldRenderCamera(false);
@@ -377,13 +372,9 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             text1: `❌ Lỗi: đọc vé số không thành công. Vui lòng đưa vé vào sát khung hình và thử lại!`,
             position: 'bottom',
             bottomOffset: 150,
-            visibilityTime: 700,
+            visibilityTime: 1500,
           });
-          setShouldRenderCamera(true);
-          setHasFoundResult(false);
-          setIsScanningActive(true);
-          statsRef.current = createDefaultStats();
-          setScanResult({});
+
         }
       };
       finalizeScan();
@@ -395,18 +386,18 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       // 1. Dừng mọi tác vụ ngầm
       stopAutoCapture();
 
-    // 2. Sử dụng setTimeout để đẩy lệnh navigate ra khỏi chu kỳ render hiện tại
-    // Việc này giúp tránh lỗi "Cannot update a component while rendering another"
-    const timeoutId = setTimeout(() => {
-      if (isMounted.current) {
-        setShouldRenderCamera(false);
-        setIsTimeout(false); // Reset state an toàn
-        navigation.navigate("ErrorOCR");
-      }
-    }, 0);
+      // 2. Sử dụng setTimeout để đẩy lệnh navigate ra khỏi chu kỳ render hiện tại
+      // Việc này giúp tránh lỗi "Cannot update a component while rendering another"
+      const timeoutId = setTimeout(() => {
+        if (isMounted.current) {
+          setShouldRenderCamera(false);
+          setIsTimeout(false); // Reset state an toàn
+          navigation.navigate("ErrorOCR");
+        }
+      }, 0);
 
-    return () => clearTimeout(timeoutId);
-  }
+      return () => clearTimeout(timeoutId);
+    }
   }, [isTimeout, navigation, stopAutoCapture]);
 
   // Dọn dẹp khi unmount component hoặc khi tắt scan tay
@@ -446,7 +437,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         zoom={1}
         resizeMode='contain'
         photoQualityBalance='speed'
-
       />
 
       <View style={themed($overlayContainer)}>
@@ -472,15 +462,13 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
           }
         />
         <ScanInfoOverlay isVisible={isScanningActive || hasFoundResult} data={scanResult} />
-        {isScanningActive && !hasFoundResult && (
-          <ScanningTimer
-            ref={timerRef}
-            isActive={isScanningActive}
-            maxTime={10}
-            onTimeout={handleTimeout}
-            style={themed($scanTimerWrapper)}
-          />
-        )}
+        <ScanningTimer
+          ref={timerRef}
+          isActive={isScanningActive && !hasFoundResult}
+          maxTime={10}
+          onTimeout={handleTimeout}
+          style={themed($scanTimerWrapper)}
+        />
 
 
 
