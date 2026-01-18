@@ -367,6 +367,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             navigation.navigate('TicketDetail', { ticketId: response.data?.data?.ticket?._id, source: 'scan' });
           }, 200);
         } else {
+          setShouldRenderCamera(true);
           Toast.show({
             type: 'info',
             text1: `❌ Lỗi: đọc vé số không thành công. Vui lòng đưa vé vào sát khung hình và thử lại!`,
