@@ -18,11 +18,11 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { setDateSelected } from "@/store/slices/lotterySlice";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { ResultSettingsSheet } from "@/components/ResultTicket/ResultSettingsSheet";
-import { DateSwipeWrapper } from "@/components/ResultTicket/DateSwipeWrapper";
+import { shallowEqual } from "react-redux"
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
   // how to get params from _props.route.params
-
+  console.log("re-render")
   const { themed, theme: { colors, spacing } } = useAppTheme();
   const { navigation } = _props;
   const dispatch = useAppDispatch()
@@ -34,16 +34,18 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
   // Kiểm tra xem ngày đang chọn có phải hôm nay không để chặn nút Next
   const isSelectedToday = isToday(parseISO(dateSelected));
 
-  let regionDrawStatus = useAppSelector((state) => state.timeDraw.regions);
+  let regionDrawNorthStatus = useAppSelector((state) => state.timeDraw.regions.north, shallowEqual);
+  let regionDrawSouthStatus = useAppSelector((state) => state.timeDraw.regions.south, shallowEqual);
+  let regionDrawCentralStatus = useAppSelector((state) => state.timeDraw.regions.central, shallowEqual);
 
   let tittleHeader = "Kết quả xổ số";
-  if (regionDrawStatus.south.type === 'LIVE' && isSelectedToday) {
+  if (regionDrawSouthStatus.type === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MN";
   }
-  else if (regionDrawStatus.central.type === 'LIVE' && isSelectedToday) {
+  else if (regionDrawCentralStatus.type === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MT";
   }
-  else if (regionDrawStatus.north.type === 'LIVE' && isSelectedToday) {
+  else if (regionDrawNorthStatus.type === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MB";
   }
 
