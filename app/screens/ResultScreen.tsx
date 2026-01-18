@@ -1,51 +1,45 @@
 import { Header } from "@/components/Header";
 import { HomeTabScreenProps } from "@/navigators/navigationTypes";
 import { useAppTheme } from "@/theme/context";
-import { Modal, Pressable, TouchableOpacity, View, ViewStyle } from "react-native";
+import { TouchableOpacity, View, ViewStyle } from "react-native";
 import IconSetting from "@assets/svg/setting.svg";
-import IconArrowLeft from "@assets/svg/arrow-left.svg";
 import IconBack from "@assets/svg/arrow-left.svg";
-import IconArrowRight from "@assets/svg/arrow-right.svg";
-import IconCalendar from "@assets/svg/calendar.svg";
 import { ThemedStyle } from "@/theme/types";
-import { Text } from "@/components/Text";
 import { ResultTicketTab } from "@/components/ResultTicket/ResultTicketTab";
-import { useRef, useState } from "react";
-import { DatePicker } from "@/components/DatePicker";
-import { addDays, format, isAfter, isToday, parseISO, startOfDay } from "date-fns";
+import { useRef } from "react";
+import { format, isAfter, isToday, parseISO, startOfDay } from "date-fns";
 import Toast from "react-native-toast-message";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setDateSelected } from "@/store/slices/lotterySlice";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { ResultSettingsSheet } from "@/components/ResultTicket/ResultSettingsSheet";
 import { shallowEqual } from "react-redux"
+import { HorizontalDatePicker } from "@/components/ResultTicket/HorizontalDatePicker";
 
 export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function ResultScreen(_props) {
   // how to get params from _props.route.params
-  console.log("re-render")
   const { themed, theme: { colors, spacing } } = useAppTheme();
   const { navigation } = _props;
   const dispatch = useAppDispatch()
 
-  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
   const settingsSheetRef = useRef<BottomSheet>(null);
 
   // Kiểm tra xem ngày đang chọn có phải hôm nay không để chặn nút Next
   const isSelectedToday = isToday(parseISO(dateSelected));
 
-  let regionDrawNorthStatus = useAppSelector((state) => state.timeDraw.regions.north, shallowEqual);
-  let regionDrawSouthStatus = useAppSelector((state) => state.timeDraw.regions.south, shallowEqual);
-  let regionDrawCentralStatus = useAppSelector((state) => state.timeDraw.regions.central, shallowEqual);
+  let regionDrawNorthStatus = useAppSelector((state) => state.timeDraw.regions.north.type, shallowEqual);
+  let regionDrawSouthStatus = useAppSelector((state) => state.timeDraw.regions.south.type, shallowEqual);
+  let regionDrawCentralStatus = useAppSelector((state) => state.timeDraw.regions.central.type, shallowEqual);
 
   let tittleHeader = "Kết quả xổ số";
-  if (regionDrawSouthStatus.type === 'LIVE' && isSelectedToday) {
+  if (regionDrawSouthStatus === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MN";
   }
-  else if (regionDrawCentralStatus.type === 'LIVE' && isSelectedToday) {
+  else if (regionDrawCentralStatus === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MT";
   }
-  else if (regionDrawNorthStatus.type === 'LIVE' && isSelectedToday) {
+  else if (regionDrawNorthStatus === 'LIVE' && isSelectedToday) {
     tittleHeader = "🔴 LIVE xổ số - MB";
   }
 
@@ -53,60 +47,20 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
     settingsSheetRef.current?.expand();
   };
 
-  const handleDateSelect = (dateString: string) => {
-    // Chặn nếu người dùng cố tình chọn ngày tương lai từ DatePicker (nếu DatePicker chưa chặn)
-    if (isAfter(parseISO(dateString), startOfDay(new Date()))) {
+  const handleDateChange = (date: Date) => {
+    const dateString = format(date, "yyyy-MM-dd");
+
+    if (isAfter(startOfDay(date), startOfDay(new Date()))) {
       Toast.show({
         type: 'error',
-        text1: `Ngày quá xa so với thực tế!`,
+        text1: `Ngày không được vượt quá hôm nay!`,
         position: 'bottom',
-        bottomOffset: 150,
-        visibilityTime: 1000,
       });
-    } else {
-      // Dispatch action to update dateSelected in the Redux store
-      dispatch(setDateSelected(dateString));
+      return;
     }
-    setIsCalendarVisible(false);
+    dispatch(setDateSelected(dateString));
   };
 
-  const formatDateDisplay = (dateString: string) => {
-    const date = new Date(dateString);
-    // Tên thứ trong tiếng Việt (Cần điều chỉnh nếu bạn muốn locale hoàn chỉnh)
-    const days = ["CN", "THỨ 2", "THỨ 3", "THỨ 4", "THỨ 5", "THỨ 6", "THỨ 7"];
-    const dayName = days[date.getDay()];
-    const formattedDate = `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
-
-    // check the dateString is today or yesterday
-    let secondaryTitle = '';
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(today.getDate() - 1);
-    if (date.toDateString() === today.toDateString()) {
-      secondaryTitle = 'Hôm nay';
-    }
-    else if (date.toDateString() === yesterday.toDateString()) {
-      secondaryTitle = 'Hôm qua';
-    }
-
-    return {
-      dayTitle: `${dayName}${secondaryTitle ? ' ∘ ' + secondaryTitle : ''}`,
-      formattedDate
-    };
-  };
-
-  const handlePrevious = () => {
-    const date = parseISO(dateSelected);
-    dispatch(setDateSelected(format(addDays(date, -1), "yyyy-MM-dd")));
-  }
-
-  const handleNext = () => {
-    // Nếu là hôm nay thì không làm gì cả
-    if (isSelectedToday) return;
-
-    const date = parseISO(dateSelected);
-    dispatch(setDateSelected(format(addDays(date, 1), "yyyy-MM-dd")));
-  }
 
   const SettingPressableIcon = () => {
     return (
@@ -133,54 +87,15 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
         backgroundColor={colors.background}
         containerStyle={{ paddingHorizontal: spacing.md, backgroundColor: colors.surface }}
         titleStyle={{ color: colors.text, fontWeight: "bold", fontSize: 20 }}
-        style={{ height: 48 }}
+        style={{ height: 42 }}
       />
-      <View style={themed($dateWrapper)}>
-        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handlePrevious}>
-          <IconArrowLeft width={16} height={16} color={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity style={themed($dateSelectWrapper)} activeOpacity={0.7} onPress={() => setIsCalendarVisible(true)}>
-          <View style={themed($calendarWrapper)}>
-            <IconCalendar width={22} height={22} color={colors.background} />
-          </View>
-          <View>
-            <Text text={formatDateDisplay(dateSelected).dayTitle} style={{ color: colors.textDim }} weight="semiBold" />
-            <Text text={formatDateDisplay(dateSelected).formattedDate} style={{ color: colors.text }} weight="bold" />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={themed($arrowWrapper)} activeOpacity={0.5} onPress={handleNext} disabled={isSelectedToday}>
-          <IconArrowRight width={16} height={16} color={isSelectedToday ? colors.palette.neutral400 : colors.text} />
-        </TouchableOpacity>
-
-        <Modal
-          animationType="fade" // Hiệu ứng chuyển cảnh
-          transparent={true} // Rất quan trọng để nhìn thấy nền mờ
-          visible={isCalendarVisible}
-          onRequestClose={() => setIsCalendarVisible(false)} // Hỗ trợ Android back button
-        >
-          <Pressable
-            style={themed($modalOverlay)}
-            onPress={() => setIsCalendarVisible(false)} // Bấm ngoài Modal để đóng
-          >
-            <View style={themed($modalContent)}>
-              <DatePicker
-                onDateSelect={handleDateSelect}
-                initialDate={dateSelected}
-              />
-              {/* Thêm nút Đóng/Xác nhận nếu cần */}
-            </View>
-          </Pressable>
-        </Modal>
+      <View style={themed($datePickerContainer)}>
+        <HorizontalDatePicker
+          selectedDate={parseISO(dateSelected)}
+          onDateChange={handleDateChange}
+        />
       </View>
       <ResultTicketTab />
-      {/* <DateSwipeWrapper
-        onSwipeLeft={handleNext}
-        onSwipeRight={handlePrevious}
-        dependency={dateSelected} // Truyền vào để đồng bộ animation
-      >
-        <ResultTicketTab />
-      </DateSwipeWrapper> */}
       <ResultSettingsSheet ref={settingsSheetRef} />
     </View>
   )
@@ -249,4 +164,8 @@ const $modalContent: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   padding: spacing.md,
   height: 400,
   // Thêm các style khác nếu cần
+})
+
+const $datePickerContainer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  backgroundColor: colors.background,
 })

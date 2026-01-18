@@ -1,5 +1,5 @@
 // Create HomeScreen.tsx
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { View, ViewStyle, TextStyle, TouchableOpacity, Image, ImageStyle } from 'react-native';
 import { useAppTheme } from '@/theme/context';
 import type { ThemedStyle } from '@/theme/types';
@@ -9,7 +9,6 @@ import { $styles } from '@/theme/styles';
 import { Text } from "@/components/Text"
 import { Header } from '@/components/Header';
 import IconBellNoti from "@assets/svg/bell-noti.svg";
-import IconMammon from "@assets/svg/mammon.svg";
 import IconScan from "@assets/svg/scan.svg";
 import IconArrowRight from "@assets/svg/arrow-right.svg";
 import IconStatistic from "@assets/svg/statistic.svg";
@@ -17,6 +16,7 @@ import IconFind from "@assets/svg/find.svg";
 import { formatDate, getDayOfWeek } from '@/utils/formatDate';
 import { dataSubMenu, getStatusTag, REGION_DATA } from '@/constants/homeConstants';
 import { Region } from '@/constants/lotteryTicket';
+import { Animated, Easing } from 'react-native';
 
 
 
@@ -24,12 +24,51 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
   const { themed, theme: { colors, spacing } } = useAppTheme();
   const { navigation } = _props
 
-  const [lotteryResults, setLotteryResults] = useState({
-    MB: { db: '87244', comment: 'Lô 48 lại về lần thứ 3 liên tiếp' },
-    MT: { db: '567834', comment: 'Hôm nay lô về nhiều đầu chẵn' },
-    MN: { db: '769534', comment: 'Kết quả mới cập nhật' },
+  const scanAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        // Chạy từ vị trí 1/4 xuống 3/4 của icon (tổng cộng 1/2 chiều cao)
+        Animated.timing(scanAnim, {
+          toValue: 1, // Chúng ta dùng giá trị từ 0 đến 1 để nội suy (interpolate) cho dễ
+          duration: 3000, // 3 giây để chạy xuống -> rất chậm và chuyên nghiệp
+          easing: Easing.inOut(Easing.sin), // Chạy mượt ở hai đầu
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanAnim, {
+          toValue: 0,
+          duration: 3000, // 3 giây để chạy lên
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const [lotteryResults] = useState({
+    MB: [{ province: 'Hà Nội', db: '87244' }],
+    MT: [
+      { province: 'Đà Nẵng', db: '567834' },
+      { province: 'Khánh Hòa', db: '112233' }
+    ],
+    MN: [
+      { province: 'TP.HCM', db: '769534' },
+      { province: 'Long An', db: '445566' },
+      { province: 'Tiền Giang', db: '998877' }
+    ],
   });
 
+  // Nội suy vị trí di chuyển
+  const translateY = scanAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, 60], // Chỉ chạy trong khoảng giữa từ 20px đến 60px
+  });
+
+  // Nội suy độ mờ (tùy chọn: nhạt dần khi ở hai đầu và đậm ở giữa)
+  const opacity = scanAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.3, 1, 0.3],
+  });
 
 
   const BellPressableIcon = () => {
@@ -44,7 +83,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
     <>
       <Header
         title="Thần dò số"
-        LeftActionComponent={<IconMammon width={50} height={50} />}
+        LeftActionComponent={<Image source={require('@assets/images/app-icon-android-adaptive-foreground.png')} style={{ width: 55, height: 55 }} />}
         safeAreaEdges={["top"]}
         backgroundColor={colors.background}
         RightActionComponent={<BellPressableIcon />}
@@ -53,7 +92,20 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
       />
       <Screen preset="scroll" contentContainerStyle={$styles.container}>
         <TouchableOpacity style={themed($scanWrapper)} activeOpacity={0.7} onPress={() => navigation.navigate('Scan')}>
-          <IconScan width={80} height={80} />
+          <View style={themed($iconScanContainer)}>
+            <IconScan width={80} height={80} />
+
+            <Animated.View
+              style={[
+                themed($scanLine),
+                {
+                  transform: [{ translateY }],
+                  opacity, // Thêm hiệu ứng mờ ảo
+                  backgroundColor: colors.primary
+                }
+              ]}
+            />
+          </View>
           <Text text='Scan ảnh vé số' weight='bold' size="lg" />
           <Text text='Bạn sẽ nhận kết quả ngay lập tức' preset='default' weight='light' style={{ textAlign: 'center' }} />
         </TouchableOpacity>
@@ -62,6 +114,11 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
             <TouchableOpacity key={label} style={themed($subMenuItemWrapper)} activeOpacity={0.7} onPress={() => navigation.navigate(navigate as any, {})}>
               <View style={themed($iconWrapper)}>
                 <Icon width={20} height={20} color={colors.primary} />
+                {label === 'Lịch xổ số' && (
+                  <View style={themed($badge)}>
+                    <Text text="3" style={themed($badgeText)} />
+                  </View>
+                )}
               </View>
               <Text text={label} weight='bold' size="sm" />
             </TouchableOpacity>
@@ -69,8 +126,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
 
         </View>
 
-        {/* Kết quả hôm nay */}
-        <View style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
+        <View style={{ marginTop: spacing.sm, marginBottom: spacing.xxs }}>
           <Text
             text={`Kết quả hôm nay: ${getDayOfWeek(new Date())}, ${formatDate(new Date())}`}
             size='lg'
@@ -80,58 +136,31 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
           />
         </View>
 
-        {/* 3 Miền Bắc Trung Nam */}
-        <View style={{ flexDirection: 'column', gap: spacing.md, marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'column', gap: spacing.xs, marginBottom: spacing.sm }}>
           {REGION_DATA.map((region) => {
-            const result = lotteryResults[region.regionCode as keyof typeof lotteryResults] // Lấy data tương ứng từ state
+            const provinces = lotteryResults[region.regionCode as keyof typeof lotteryResults];
             const statusTag = getStatusTag(region.id as Region);
+
             return (
-              <TouchableOpacity
-                key={region.id}
-                style={themed($resultItemWrapper)}
-                onPress={() => navigation.navigate("Result", {})}
-              >
-                {/* Khối hình ảnh và tên miền */}
-                <View>
-                  <Image
-                    source={region.image}
-                    resizeMode="contain"
-                    style={themed($imageRegion)}
-                  />
-                  <Text
-                    text={region.name}
-                    style={themed([$textRegion, { color: region.color, textAlign: 'center' }])}
-                  />
+              <TouchableOpacity key={region.id} style={themed($resultItemWrapper)} onPress={() => navigation.navigate("Result", {})}>
+                <View style={{ alignItems: 'center' }}>
+                  <Image source={region.image} resizeMode="contain" style={themed($imageRegion)} />
+                  <Text text={region.name} style={themed([$textRegion, { color: region.color }])} />
                 </View>
 
-
-                <View style={{ flex: 1, justifyContent: 'space-between', paddingLeft: spacing.sm }}>
-                  <View>
-
-                    <Text text='Giải ĐB:' weight='light' style={themed($textDB)}>
-                      <Text
-                        text={' ' + (result?.db || '------')}
-                        weight='bold'
-                        style={themed($textRedDB)}
-                      />
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      text={result?.comment || 'Đang cập nhật...'}
-                      weight='light'
-                      style={themed($textComment)}
-                      numberOfLines={1}
-                    />
-                  </View>
-                </View>
-                <View style={themed([$tagWrapper, { backgroundColor: statusTag.bgColor, borderColor: statusTag.borderColor, }])}>
-                  <Text text={statusTag.label} style={{ color: statusTag.color, fontSize: 10, fontWeight: 'bold' }} />
-                </View>
-                <View>
-                  <IconArrowRight width={16} height={16} />
+                <View style={{ flex: 1, paddingLeft: spacing.xs }}>
+                  {provinces.map((item, idx) => (
+                    <View key={idx} style={themed($provinceRow)}>
+                      <Text text={item.province} size="xs" weight="medium" style={{ color: colors.textDim, width: 65 }} numberOfLines={1} />
+                      <Text text={item.db} weight="bold" style={themed($textRedDBSmall)} />
+                    </View>
+                  ))}
                 </View>
 
+                <View style={themed([$tagWrapper, { backgroundColor: statusTag.bgColor, borderColor: statusTag.borderColor }])}>
+                  <Text text={statusTag.label} style={{ color: statusTag.color, fontSize: 9, fontWeight: 'bold' }} />
+                </View>
+                <IconArrowRight width={14} height={14} />
               </TouchableOpacity>
             );
           })}
@@ -166,9 +195,8 @@ const $scanWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flexDirection: 'column',
   alignItems: 'center',
   paddingHorizontal: spacing.md,
-  paddingVertical: spacing.md,
+  paddingVertical: spacing.sm,
   justifyContent: 'center',
-  gap: spacing.xxxs,
   //box shadow
   shadowColor: colors.palette.neutral600,
   shadowOffset: { width: 0, height: 2 },
@@ -178,7 +206,7 @@ const $scanWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
 })
 
 const $subMenuWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  marginTop: spacing.md,
+  marginTop: spacing.sm,
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -192,8 +220,7 @@ const $subMenuItemWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flex: 1,
   justifyContent: 'center',
   alignItems: 'center',
-  gap: spacing.xxxs,
-  paddingVertical: spacing.md,
+  paddingVertical: spacing.sm,
   //box shadow
   shadowColor: colors.palette.neutral400,
   shadowOffset: { width: 0, height: 2 },
@@ -221,7 +248,7 @@ const $resultItemWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   borderRadius: spacing.md,
   flexDirection: 'row',
   paddingHorizontal: spacing.sm,
-  paddingVertical: spacing.md,
+  paddingVertical: spacing.sm,
   alignItems: 'center',
   gap: spacing.sm,
   position: 'relative',
@@ -233,11 +260,6 @@ const $resultItemWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   elevation: 5,
 })
 
-
-const $textRegion: ThemedStyle<TextStyle> = ({ }) => ({
-  fontWeight: "700",
-  fontSize: 16,
-})
 
 const $textDB: ThemedStyle<TextStyle> = ({ colors }) => ({
   fontWeight: "600",
@@ -292,4 +314,67 @@ const $tagWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   borderRadius: spacing.md,
   borderColor: colors.palette.neutral300,
   borderWidth: 1,
+})
+
+const $badge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: 'absolute',
+  top: -2,
+  right: -2,
+  backgroundColor: colors.palette.primary500,
+  borderRadius: 10,
+  width: 20,
+  height: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 1.5,
+  borderColor: colors.surface,
+})
+
+const $badgeText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.palette.accent400,
+  fontSize: 11,
+  fontWeight: 'bold',
+  lineHeight: 11,
+})
+
+const $iconScanContainer: ThemedStyle<ViewStyle> = () => ({
+  width: 80,
+  height: 80,
+  position: 'relative',
+  overflow: 'hidden', // Quan trọng nhất: Cắt bỏ phần line thừa khi nó chạy ra ngoài 80px
+  marginBottom: 8,
+  borderRadius: 40,
+})
+
+const $scanLine: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  height: 3, // Độ dày thanh quét
+  zIndex: 10,
+  // Hiệu ứng phát sáng
+  shadowColor: colors.primary,
+  shadowOffset: { width: 0, height: 0 },
+  shadowOpacity: 1,
+  shadowRadius: 10,
+  elevation: 8,
+})
+
+const $provinceRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 2,
+  gap: spacing.xxs,
+})
+
+const $textRedDBSmall: ThemedStyle<TextStyle> = ({ colors }) => ({
+  fontSize: 16, // Nhỏ hơn giải ĐB cũ để xếp được nhiều đài
+  color: colors.palette.primary400,
+})
+
+const $textRegion: ThemedStyle<TextStyle> = () => ({
+  fontWeight: "700",
+  fontSize: 14, // Giảm nhẹ size để cân đối với list đài
+  textAlign: 'center'
 })

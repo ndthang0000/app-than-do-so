@@ -32,7 +32,7 @@ export const REGION_DATA = [
 export const dataSubMenu = [
   {
     icon: IconManualInput,
-    label: 'Nhập vé',
+    label: 'Dò vé',
     navigate: 'ManualInput',
   },
   {

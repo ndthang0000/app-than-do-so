@@ -3,35 +3,83 @@ import { NorthResult } from "@/screens/NorthResult"
 import { SouthResult } from "@/screens/SouthResult"
 import { useAppTheme } from "@/theme/context"
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs"
+import { AnimatedTabLabel } from "./CustomTabLabel"
 
 const Tab = createMaterialTopTabNavigator()
 
 export function ResultTicketTab() {
-  const { theme: { colors } } = useAppTheme()
+  const { theme: { colors, spacing } } = useAppTheme()
   return (
     <Tab.Navigator
       screenOptions={{
         swipeEnabled: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
-        tabBarIndicatorStyle: {
-          backgroundColor: colors.primary,
-          height: 3,
-          borderRadius: 3
-        },
+        tabBarIndicatorStyle: { height: 0 },
+        tabBarPressColor: 'transparent',
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.palette.accent400, // Màu nền xám nhạt cho cả thanh tab
+          borderRadius: 12,
+          marginHorizontal: spacing.sm,
+          marginVertical: spacing.xxs,
+          height: 40, // Ép chiều cao thấp xuống
+          elevation: 0,
+          shadowOpacity: 0,
+          overflow: 'hidden',
         },
-        tabBarLabelStyle: {
-          fontWeight: "bold",
-          fontSize: 17
+        tabBarItemStyle: {
+          flex: 1,
+          padding: 0,
         },
-
+        // Quan trọng: Dùng container để căn giữa các tab
+        tabBarContentContainerStyle: {
+          alignItems: 'center',
+          paddingHorizontal: 3,
+        }
       }}
     >
-      <Tab.Screen name="Bac" component={NorthResult} options={{ title: "Miền Bắc" }} />
-      <Tab.Screen name="Trung" component={CentraResult} options={{ title: "Miền Trung" }} />
-      <Tab.Screen name="Nam" component={SouthResult} options={{ title: "Miền Nam" }} />
+      <Tab.Screen
+        name="Bac"
+        component={NorthResult}
+        options={{
+          tabBarLabel: ({ focused }) => (
+            <AnimatedTabLabel
+              focused={focused}
+              label="Miền Bắc"
+              activeColor={colors.primary}
+              inactiveColor={colors.textDim}
+            />
+          )
+        }}
+      />
+      <Tab.Screen
+        name="Trung"
+        component={CentraResult}
+        options={{
+          tabBarLabel: ({ focused }) => (
+            <AnimatedTabLabel
+              focused={focused}
+              label="Miền Trung"
+              activeColor={colors.primary}
+              inactiveColor={colors.textDim}
+            />
+          )
+        }}
+      />
+      <Tab.Screen
+        name="Nam"
+        component={SouthResult}
+        options={{
+          tabBarLabel: ({ focused }) => (
+            <AnimatedTabLabel
+              focused={focused}
+              label="Miền Nam"
+              activeColor={colors.primary}
+              inactiveColor={colors.textDim}
+            />
+          )
+        }}
+      />
     </Tab.Navigator>
   )
 }
