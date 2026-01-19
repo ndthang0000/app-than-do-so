@@ -48,7 +48,11 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
   const [isSoundReady, setIsSoundReady] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
   const [isReady, setIsReady] = useState(false);
+  const [highlightDigit, setHighlightDigit] = useState<number | null>(null);
 
+  const handleToggleHighlight = (num: number) => {
+    setHighlightDigit(prev => (prev === num ? null : num));
+  };
   const handleChangeDisplayMode = (mode: DisplayMode) => {
     setDisplayMode(mode)
   }
@@ -251,11 +255,33 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
               region={region}
               displayMode={displayMode}
               isLive={isLive}
+              highlightDigit={highlightDigit}
             />
           ))
         }
       </View>
       <DisplayModeToggleV2 value={displayMode} onChange={handleChangeDisplayMode} />
+      <View style={themed($highlightBar)}>
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+          <TouchableOpacity
+            key={num}
+            onPress={() => handleToggleHighlight(num)}
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: highlightDigit === num ? colors.primary : colors.palette.neutral200,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              text={num.toString()}
+              style={{ color: highlightDigit === num ? colors.background : colors.text, fontWeight: 'bold' }}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
       <LotoTable provinces={provinces} region={region} />
       <TouchableOpacity onPress={() => rollingSoundRef.current?.play()}><Text text="Phát nhát" /></TouchableOpacity>
     </View>
@@ -265,3 +291,12 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
 const $tableWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   // padding: spacing.sm,
 })
+
+const $highlightBar: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
+  flexDirection: 'row',
+  justifyContent: 'space-around',
+  paddingVertical: 10,
+  backgroundColor: colors.surface,
+  borderBottomWidth: 1,
+  borderColor: colors.separator,
+});

@@ -18,7 +18,8 @@ function PrizeNumbers({
   getLiveState,
   region,
   prizeKey,
-  displayMode
+  displayMode,
+  highlightDigit
 }: {
   numbers: string[]
   isTwoRow: boolean
@@ -26,7 +27,8 @@ function PrizeNumbers({
   region: Region
   prizeKey: PrizeKey
   getLiveState: (num: string, idx: number) => 'DONE' | 'ROLLING' | 'PENDING' | 'NEW',
-  displayMode: DisplayMode
+    displayMode: DisplayMode,
+    highlightDigit?: number | null
 }) {
   const renderLiveNumber = (num: string, idx: number) => (
     <View key={`${idx}`} style={{ justifyContent: "center", alignItems: "center", marginVertical: 2 }}>
@@ -37,6 +39,7 @@ function PrizeNumbers({
         prizeKey={prizeKey}
         region={region}
         displayMode={displayMode}
+        highlightDigit={highlightDigit}
       />
     </View>
   )
@@ -61,14 +64,15 @@ function PrizeNumbers({
 }
 
 // --- Component chính ResultRow ---
-export function ResultRow({ prize, provinces, index, flex, region, displayMode, isLive }: {
+export function ResultRow({ prize, provinces, index, flex, region, displayMode, isLive, highlightDigit }: {
   provinces: LotteryResult[],
   region?: Region,
   prize: PrizeKey,
   index: number,
   flex: number,
   isLive: boolean,
-  displayMode: DisplayMode
+  displayMode: DisplayMode,
+  highlightDigit: number | null
 }) {
   const { themed, theme: { colors } } = useAppTheme()
 
@@ -156,6 +160,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
           region='north'
           prizeKey={prize}
           displayMode={displayMode}
+          highlightDigit={highlightDigit}
         />
       )
     }
@@ -171,6 +176,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
               prizeKey={prize}
               region={region!}
               displayMode={displayMode}
+              highlightDigit={highlightDigit}
             />
           </View>
         ))}

@@ -93,6 +93,7 @@ export const ResultScreen: React.FC<HomeTabScreenProps<'Result'>> = function Res
         <HorizontalDatePicker
           selectedDate={parseISO(dateSelected)}
           onDateChange={handleDateChange}
+          disableFuture={true}
         />
       </View>
       <ResultTicketTab />

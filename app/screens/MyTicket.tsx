@@ -14,6 +14,7 @@ import { Region } from '@/constants/lotteryTicket';
 import { HomeTabScreenProps } from '@/navigators/navigationTypes';
 import IconSad from "@assets/svg/sad-face.svg";
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import { useIsFocused } from '@react-navigation/native';
 
 // Mapping label sang value API
 const STATUS_MAP: Record<string, WinStatus | undefined> = {
@@ -34,7 +35,7 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
   const navigation = _props.navigation;
   const { themed, theme: { colors, spacing } } = useAppTheme();
   const dispatch = useAppDispatch();
-
+  const isFocused = useIsFocused();
   // Lấy dữ liệu từ Store
   const { tickets, loading, pagination, filters } = useAppSelector(state => state.ticket);
 
@@ -58,7 +59,7 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
   const SORT_OPTIONS = [
     { label: 'Mới nhất', value: 'createdAt:desc' },
     { label: 'Cũ nhất', value: 'createdAt:asc' },
-    { label: 'Trúng to nhất', value: 'weight:desc' },
+    { label: 'Trúng to nhất', value: 'prizeMoney:desc' },
   ];
 
   // Fetch dữ liệu mỗi khi filter hoặc page thay đổi
@@ -82,6 +83,13 @@ export const MyTicketScreen: React.FC<HomeTabScreenProps<'MyTicket'>> = function
       dispatch(setPage(pagination.page + 1));
     }
   };
+
+  useEffect(() => {
+    if (isFocused) {
+      // Fetch lại trang 1 để lấy các vé mới nhất vừa quét
+      dispatch(fetchTickets({ page: 1, limit: pagination.limit, ...filters }));
+    }
+  }, [isFocused]); // Chạy mỗi khi màn hình được quay lại
 
 
   const BackIcon = () => (

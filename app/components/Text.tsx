@@ -75,7 +75,6 @@ export const Text = forwardRef(function Text(props: TextProps, ref: ForwardedRef
   return (
     <RNText {...rest} style={$styles} ref={ref}>
       {content}
-      {children}
     </RNText>
   )
 })

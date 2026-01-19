@@ -41,7 +41,15 @@ const SingleBall = () => {
   )
 }
 
-export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayMode }: { value: string, state: NumberType, textStyle: any, prizeKey: PrizeKey, region: Region, displayMode: DisplayMode }) => {
+export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayMode, highlightDigit }:
+  {
+    value: string,
+    state: NumberType,
+    textStyle: any, prizeKey:
+    PrizeKey, region: Region,
+    displayMode: DisplayMode,
+    highlightDigit?: number | null
+  }) => {
   const { theme: { colors } } = useAppTheme();
 
   // Hiệu ứng nhấp nháy cho số vừa có kết quả (NEW)
@@ -80,9 +88,39 @@ export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayM
     );
   }
 
-  if (state === 'DONE') {
-    return <Text text={value} style={textStyle} />; // Hiển thị số bình thường
+  const renderValueWithHighlight = () => {
+    // Chỉ highlight khi ở chế độ xem đầy đủ số và có số được chọn
+    if (highlightDigit === null || highlightDigit === undefined) {
+      return <Text text={value} style={textStyle} />;
+    }
+
+    const highlightStr = highlightDigit.toString();
+    const lastTwo = value.slice(-2);
+    const prefix = value.slice(0, -2);
+    const isMatch = lastTwo.includes(highlightStr);
+
+    if (isMatch) {
+      return (
+        <Text style={textStyle}>
+          {/* Phần đầu: không truyền prop text, dùng children */}
+          <Text style={textStyle}>{prefix}</Text>
+
+          {/* Phần đuôi: highlight dùng children để nhận style lồng nhau */}
+          <Text
+            style={{
+              ...textStyle,
+              color: colors.palette.accent100,
+              backgroundColor: colors.gold,
+            }}
+          >
+            {lastTwo}
+          </Text>
+        </Text>
+      );
   }
+
+    return <Text text={value} style={textStyle} />;
+  };
 
   const isNew = state === 'NEW';
 
@@ -94,13 +132,7 @@ export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayM
         { backgroundColor: isNew ? colors.palette.accent200 : 'transparent' }
       ]}
     >
-      <Text
-        text={value}
-        style={[
-          textStyle,
-          { color: isNew ? colors.palette.accent500 : colors.text }
-        ]}
-      />
+      {renderValueWithHighlight()}
     </Animated.View>
   );
 };

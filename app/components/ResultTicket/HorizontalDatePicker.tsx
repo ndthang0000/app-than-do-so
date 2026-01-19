@@ -12,9 +12,11 @@ import DateTimePickerModal from "react-native-modal-datetime-picker" // Thư vi�
 interface Props {
   selectedDate: Date
   onDateChange: (date: Date) => void
+  disableFuture?: boolean,
+  containerStyle?: ViewStyle
 }
 
-export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
+export const HorizontalDatePicker = ({ selectedDate, onDateChange, disableFuture = false, containerStyle }: Props) => {
   const { themed, theme: { colors } } = useAppTheme()
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false)
   const pagerRef = useRef<PagerView>(null)
@@ -47,14 +49,25 @@ export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
   const hideDatePicker = () => setDatePickerVisibility(false)
 
   const handleConfirm = (date: Date) => {
-    onDateChange(date)
+    // Optionally prevent selecting a future date from the modal
+    if (disableFuture) {
+      const today = startOfDay(new Date())
+      const chosen = startOfDay(date)
+      if (isAfter(chosen, today)) {
+        onDateChange(today)
+      } else {
+        onDateChange(date)
+      }
+    } else {
+      onDateChange(date)
+    }
     hideDatePicker()
   }
 
   const handleGoToday = () => onDateChange(new Date())
 
   return (
-    <View style={themed($container)}>
+    <View style={containerStyle ? containerStyle : themed($container)}>
       {/* Header Row: Hôm nay, Tháng/Năm, Icon Lịch */}
       <View style={themed($headerRow)}>
         <TouchableOpacity
@@ -90,10 +103,12 @@ export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
           let targetDate = addDays(selectedDate, offset)
 
           // 2. KIỂM TRA: Nếu lướt sang phải (targetDate sau ngày hiện tại) thì chặn
-          const today = startOfDay(new Date())
-          if (isAfter(startOfDay(targetDate), today)) {
-            // Đưa Pager về lại trang giữa mà không update date
-            targetDate = today
+          if (disableFuture) {
+            const today = startOfDay(new Date())
+            if (isAfter(startOfDay(targetDate), today)) {
+              // Đưa Pager về lại trang giữa mà không update date
+              targetDate = today
+            }
           }
 
           // 3. Nếu hợp lệ thì mới update
@@ -109,21 +124,24 @@ export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
           <View key={index} style={themed($weekPage)}>
             {week.map((day) => {
               const active = isSameDay(day, selectedDate)
+              const disabled = disableFuture && isAfter(startOfDay(day), startOfDay(new Date()))
               return (
                 <TouchableOpacity
                   key={day.toString()}
-                  onPress={() => onDateChange(day)}
-                  style={[themed($dateItem), active && themed($activeDateItem)]}
+                  onPress={() => !disabled && onDateChange(day)}
+                  disabled={disabled}
+                  accessibilityState={{ disabled }}
+                  style={[themed($dateItem), active && themed($activeDateItem), disabled && themed($disabledDateItem)]}
                 >
                   <Text
                     text={format(day, "EEEEEE", { locale: vi }).toUpperCase()}
-                    style={[themed($dayName), active && { color: colors.background }]}
+                    style={[themed($dayName), active && { color: colors.background }, disabled && { color: colors.textDim }]}
                   />
                   <Text
                     text={format(day, "d")}
-                    style={[themed($dateNumber), active && { color: colors.background }]}
+                    style={[themed($dateNumber), active && { color: colors.background }, disabled && { color: colors.textDim }]}
                   />
-                  {isToday(day) && !active && <View style={themed($todayDot)} />}
+                  {isToday(day) && !active && !disabled && <View style={themed($todayDot)} />}
                 </TouchableOpacity>
               )
             })}
@@ -137,6 +155,7 @@ export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
         onConfirm={handleConfirm}
         onCancel={hideDatePicker}
         date={selectedDate}
+        {...(disableFuture ? { maximumDate: new Date() } : {})}
         // --- Tùy chỉnh màu sắc ở đây ---
         accentColor={colors.primary} // Màu chủ đạo trên Android (vòng tròn chọn năm, các nút)
         buttonTextColorIOS={colors.primary} // Màu chữ nút "Confirm" và "Cancel" trên iOS
@@ -220,6 +239,11 @@ const $activeDateItem: ThemedStyle<ViewStyle> = ({ colors }) => ({
   shadowOpacity: 0.3,
   shadowRadius: 4,
   elevation: 5,
+})
+
+const $disabledDateItem: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  opacity: 0.35,
+  backgroundColor: colors.surface,
 })
 
 const $dayName: ThemedStyle<TextStyle> = ({ colors }) => ({

@@ -128,7 +128,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
 
         <View style={{ marginTop: spacing.sm, marginBottom: spacing.xxs }}>
           <Text
-            text={`Kết quả hôm nay: ${getDayOfWeek(new Date())}, ${formatDate(new Date())}`}
+            text={`XS Kiến Thiết: ${getDayOfWeek(new Date())}, ${formatDate(new Date())}`}
             size='lg'
             weight='bold'
             numberOfLines={1}

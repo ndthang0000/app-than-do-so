@@ -43,9 +43,14 @@ export function DisplayModeToggleV2({
 }
 
 /** Styles */
-const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $container: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   marginTop: spacing.md,
   paddingHorizontal: spacing.md,
+  backgroundColor: colors.surface,
+  paddingVertical: spacing.sm,
+  borderBottomWidth: 1,
+  borderTopWidth: 1,
+  borderColor: colors.separator,
 })
 
 const $radioGroup: ThemedStyle<ViewStyle> = () => ({
