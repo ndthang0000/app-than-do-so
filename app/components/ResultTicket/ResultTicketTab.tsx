@@ -4,14 +4,16 @@ import { SouthResult } from "@/screens/SouthResult"
 import { useAppTheme } from "@/theme/context"
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs"
 import { AnimatedTabLabel } from "./CustomTabLabel"
+import { memo } from "react"
 
 const Tab = createMaterialTopTabNavigator()
 
-export function ResultTicketTab() {
+export const ResultTicketTab = memo(() => {
   const { theme: { colors, spacing } } = useAppTheme()
   return (
     <Tab.Navigator
       screenOptions={{
+        lazy: true,
         swipeEnabled: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
@@ -82,4 +84,4 @@ export function ResultTicketTab() {
       />
     </Tab.Navigator>
   )
-}
+})

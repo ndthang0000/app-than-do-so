@@ -4,7 +4,7 @@ import { ResultRow } from "./ResultRow"
 import { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
-import { useEffect, useRef, useState } from "react"
+import { memo, useEffect, useMemo, useRef, useState } from "react"
 import { LotoTable } from "./LotoTable"
 import { createDefaultLotteryData, PrizeKey, Region } from "@/constants/lotteryTicket"
 import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
@@ -34,7 +34,7 @@ const PRIZES_NORTH: PrizeKey[] = [
 ]
 
 
-export function LotteryResultTable({ region, isLive }: Props) {
+export const LotteryResultTable = memo(({ region, isLive }: Props) => {
 
   const $containerInsets = useSafeAreaInsetsStyle(["bottom"])
   const { themed, theme: { colors } } = useAppTheme();
@@ -47,15 +47,20 @@ export function LotteryResultTable({ region, isLive }: Props) {
   const newSoundRef = useRef<Sound | null>(null);
   const [isSoundReady, setIsSoundReady] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
+  const [isReady, setIsReady] = useState(false);
 
   const handleChangeDisplayMode = (mode: DisplayMode) => {
     setDisplayMode(mode)
   }
   const isFinished = provinces.every(province => province.isFinished);
 
-  const calculateFlex = provinces.length == 3 ? 2 : (provinces.length == 1 ? 5 : 3);
+  const calculateFlex = useMemo(() =>
+    provinces.length === 3 ? 2 : (provinces.length === 1 ? 5 : 3),
+    [provinces.length]);
 
-  const choosePrizes = region === "north" ? PRIZES_NORTH : PRIZES;
+  const choosePrizes = useMemo(() =>
+    region === "north" ? PRIZES_NORTH : PRIZES,
+    [region]);
 
   // Hàm trả lại âm lượng cũ
   const restoreVolume = () => {
@@ -222,6 +227,13 @@ export function LotteryResultTable({ region, isLive }: Props) {
     };
   }, []); // Chạy 1 lần duy nhất khi Mount
 
+  useEffect(() => {
+    const timer = setTimeout(() => setIsReady(true), 150); // Delay nhẹ để UI Date mượt hơn
+    return () => clearTimeout(timer);
+  }, [dateSelected]);
+
+  if (!isReady) return <View style={{ flex: 1 }} />;
+
   return (
     <View style={[themed($tableWrapper), $containerInsets]}>
 
@@ -248,7 +260,7 @@ export function LotteryResultTable({ region, isLive }: Props) {
       <TouchableOpacity onPress={() => rollingSoundRef.current?.play()}><Text text="Phát nhát" /></TouchableOpacity>
     </View>
   )
-}
+})
 
 const $tableWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   // padding: spacing.sm,

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from "react"
-import { View, TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from "react-native"
+import React, { useState, useMemo, useRef } from "react"
+import { View, TouchableOpacity, ViewStyle, TextStyle } from "react-native"
 import PagerView from "react-native-pager-view"
 import { format, addDays, startOfWeek, eachDayOfInterval, isSameDay, isToday, startOfDay, isAfter } from "date-fns"
 import { vi } from "date-fns/locale"
@@ -15,7 +15,7 @@ interface Props {
 }
 
 export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
-  const { themed, theme: { colors, spacing } } = useAppTheme()
+  const { themed, theme: { colors } } = useAppTheme()
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false)
   const pagerRef = useRef<PagerView>(null)
 
@@ -87,14 +87,13 @@ export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
 
           // 1. Tính toán ngày mục tiêu dựa trên hướng vuốt
           const offset = position < 1 ? -7 : 7
-          const targetDate = addDays(selectedDate, offset)
+          let targetDate = addDays(selectedDate, offset)
 
           // 2. KIỂM TRA: Nếu lướt sang phải (targetDate sau ngày hiện tại) thì chặn
           const today = startOfDay(new Date())
           if (isAfter(startOfDay(targetDate), today)) {
             // Đưa Pager về lại trang giữa mà không update date
-            pagerRef.current?.setPageWithoutAnimation(1)
-            return
+            targetDate = today
           }
 
           // 3. Nếu hợp lệ thì mới update
@@ -138,6 +137,13 @@ export const HorizontalDatePicker = ({ selectedDate, onDateChange }: Props) => {
         onConfirm={handleConfirm}
         onCancel={hideDatePicker}
         date={selectedDate}
+        // --- Tùy chỉnh màu sắc ở đây ---
+        accentColor={colors.primary} // Màu chủ đạo trên Android (vòng tròn chọn năm, các nút)
+        buttonTextColorIOS={colors.primary} // Màu chữ nút "Confirm" và "Cancel" trên iOS
+        textColor={colors.text} // Màu chữ của phần số/ngày (thường là đen hoặc trắng tùy theme)
+        confirmTextIOS="Chọn" // Thay đổi text nút xác nhận
+        cancelTextIOS="Hủy"
+        locale="vi_VN" // Đảm bảo hiển thị tiếng Việt
 
       />
     </View>
