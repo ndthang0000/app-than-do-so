@@ -25,6 +25,8 @@ import { fastParseFrame, getCodePenaltyFactor } from '@/utils/fastParseFrame';
 import { ScanningTimer, ScanningTimerRef } from '@/components/Scan/ScanningTimer';
 import { prepareTicketPayload } from '@/utils/ticket-helper';
 import { api } from '@/services/api';
+import { BottomSheetModal, BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { ScanTipsSheet } from '@/components/Scan/ScanTipsSheet';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // ĐỊNH NGHĨA KÍCH THƯỚC KHUNG QUÉT CHUẨN 1:2
@@ -106,7 +108,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const isStoppingRef = useRef(false);
   const isTakingPhotoRef = useRef(false);
-
+  const tipsSheetRef = useRef<BottomSheetModal>(null)
   // States
   const [shouldRenderCamera, setShouldRenderCamera] = useState(false);
   const [isPermissionGranted, setIsPermissionGranted] = useState(false);
@@ -284,6 +286,10 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     }
   };
 
+  const openTips = () => {
+    tipsSheetRef.current?.present();
+  }
+
   const handleToggleFlash = () => {
     setIsFlashOn(!isFlashOn);
     Toast.show({
@@ -424,8 +430,9 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
   }
 
   return (
-    <View style={themed($container)} ref={containerRef}>
-      <Camera
+    <BottomSheetModalProvider>
+      <View style={themed($container)} ref={containerRef}>
+        <Camera
         ref={camera}
         style={StyleSheet.absoluteFill}
         device={device}
@@ -522,7 +529,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
             <Text text={isScanningActive ? 'Đang quét...' : 'Nhấn để bắt đầu quét'} size='xs' weight='bold' style={{ color: isScanningActive ? colors.tint : colors.palette.neutral100, textAlign: 'center' }} />
           </View>
 
-          <TouchableOpacity style={themed($footerBtn)}>
+            <TouchableOpacity style={themed($footerBtn)} onPress={openTips} disabled={isScanningActive}>
             <View style={themed($iconCircle)}>
               <IconLightBulb color={colors.palette.accent400} width={24} height={24} />
             </View>
@@ -530,8 +537,10 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
           </TouchableOpacity>
         </View>
       </View>
-      <Toast config={toastConfig} />
-    </View>
+        <ScanTipsSheet ref={tipsSheetRef} />
+        <Toast config={toastConfig} />
+      </View>
+    </BottomSheetModalProvider>
   );
 };
 
