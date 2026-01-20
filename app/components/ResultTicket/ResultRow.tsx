@@ -55,7 +55,7 @@ function PrizeNumbers({
   const secondRow = numbers.slice(3, 6)
 
   return (
-    <View style={{ flexDirection: "column", flex: 1, paddingVertical: 10 }}>
+    <View style={{ flexDirection: "column", flex: 1, paddingVertical: 2 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-evenly" }}>
         {firstRow.map((num, idx) => renderLiveNumber(num, idx))}
       </View>

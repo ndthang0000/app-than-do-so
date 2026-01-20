@@ -42,6 +42,7 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
   const dispatch = useAppDispatch()
   const isFocused = useIsFocused()
   const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
+  const appSettings = useAppSelector((state) => state.auth.user?.settingApp);
   const provinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || createDefaultLotteryData(region, dateSelected);
   const rollingSoundRef = useRef<Sound | null>(null);
   const newSoundRef = useRef<Sound | null>(null);
@@ -72,6 +73,9 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
   };
 
   const playNewSoundWithDucking = (station: string, rank: string, value: string) => {
+    // Kiểm tra setting isVoiceEnabled
+    if (!appSettings?.isVoiceEnabled) return;
+
     // 1. Giảm âm lượng nhạc nền xuống mức nhỏ để nghe tiếng chuông rõ hơn
     rollingSoundRef.current?.setVolume(0.1);
 
@@ -105,12 +109,12 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
       // Ứng dụng chuyển sang nền, tạm dừng nhạc
       rollingSoundRef.current?.pause();
     } else {
-      // Ứng dụng trở lại foreground, nếu isLive thì tiếp tục phát nhạc
-      if (isLive) {
+      // Ứng dụng trở lại foreground, nếu isLive và isMusicEnabled thì tiếp tục phát nhạc
+      if (isLive && appSettings?.isMusicEnabled) {
         rollingSoundRef.current?.play();
       }
     }
-  }, [appState, isLive, isFinished]);
+  }, [appState, isLive, isFinished, appSettings?.isMusicEnabled]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", nextAppState => {
@@ -176,7 +180,7 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
     let timer: NodeJS.Timeout;
 
     const startSound = () => {
-      if (isLive && isSoundReady && rollingSoundRef.current && isFocused && !isFinished) {
+      if (isLive && isSoundReady && rollingSoundRef.current && isFocused && !isFinished && appSettings?.isMusicEnabled) {
         // Đảm bảo volume mức cao
         rollingSoundRef.current.setVolume(0.5);
 
@@ -198,7 +202,7 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
       clearTimeout(timer);
       rollingSoundRef.current?.pause();
     };
-  }, [isLive, isSoundReady, isFocused]); // Lắng nghe cả isReady (state báo load xong nhạc)
+  }, [isLive, isSoundReady, isFocused, isFinished, appSettings?.isMusicEnabled]); // Lắng nghe cả isReady (state báo load xong nhạc)
 
   useEffect(() => {
     // KHỞI TẠO
@@ -282,8 +286,7 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
           </TouchableOpacity>
         ))}
       </View>
-      <LotoTable provinces={provinces} region={region} />
-      <TouchableOpacity onPress={() => rollingSoundRef.current?.play()}><Text text="Phát nhát" /></TouchableOpacity>
+      {appSettings?.showLotoTable && <LotoTable provinces={provinces} region={region} />}
     </View>
   )
 })
@@ -299,4 +302,5 @@ const $highlightBar: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   backgroundColor: colors.surface,
   borderBottomWidth: 1,
   borderColor: colors.separator,
+  paddingHorizontal: spacing.sm,
 });
