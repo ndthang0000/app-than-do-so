@@ -1,8 +1,10 @@
 import { useAppTheme } from "@/theme/context";
 import { ThemedStyle } from "@/theme/types";
-import { TextStyle, View, ViewStyle } from "react-native";
+import { View, ViewStyle } from "react-native";
 import { Text } from "../Text";
 import { LotteryResult } from "@/store/slices/lotterySlice";
+import { getLotteryTypography, FontSizeLevel } from "@/constants/lotteryTicket";
+import { useAppSelector } from "@/store";
 
 type Props = {
   provinces: LotteryResult[],
@@ -10,6 +12,8 @@ type Props = {
 
 export function HeaderRowNorth({ provinces }: Props) {
   const { themed, theme: { colors } } = useAppTheme();
+  const userFontSize = useAppSelector(state => state.auth.user?.settingApp?.fontSize as FontSizeLevel) || 'MEDIUM';
+  const typography = getLotteryTypography(userFontSize);
 
   const headerText = `${provinces[0]?.station || 'Miền Bắc'}: ${provinces[0]?.prizes?.specialCode || ''}`;
 
@@ -17,7 +21,7 @@ export function HeaderRowNorth({ provinces }: Props) {
     <View style={themed($wrapper)}>
       <Text
         text={headerText}
-        style={themed($headerText)}
+        style={{ color: colors.palette.secondary600, fontWeight: "700", fontSize: typography.lotoHeader.fontSize, lineHeight: typography.lotoHeader.lineHeight }}
         numberOfLines={1}
         adjustsFontSizeToFit={true}
       />
@@ -35,11 +39,4 @@ const $wrapper: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   alignItems: "center",
   borderWidth: 0.5,
   borderColor: colors.separator,
-})
-
-const $headerText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.palette.secondary600,
-  fontWeight: "700",
-  fontSize: 18,
-
 })

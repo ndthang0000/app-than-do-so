@@ -1,16 +1,16 @@
 import React from "react"
-import { View, ViewStyle } from "react-native"
+import { TextStyle, View, ViewStyle } from "react-native"
 import LinearGradient from "react-native-linear-gradient"
 import { useAppTheme } from "@/theme/context"
 import { Text } from "../Text"
 import { LiveNumber } from "./LiveNumber"
 import { ThemedStyle } from "@/theme/types"
 import { DisplayMode } from "./LotteryResultTable"
-import { LOTTERY_TYPOGRAPHY, PrizeKey, Region } from "@/constants/lotteryTicket"
+import { getLotteryTypography, PrizeKey, Region, FontSizeLevel } from "@/constants/lotteryTicket"
 import { LotteryResult } from "@/store/slices/lotterySlice"
 import { useAppSelector } from "@/store"
 
-// --- Component PrizeNumbers hỗ trợ Live ---
+// --- render Row have 2 line
 function PrizeNumbers({
   numbers,
   isTwoRow,
@@ -19,16 +19,18 @@ function PrizeNumbers({
   region,
   prizeKey,
   displayMode,
-  highlightDigit
+  highlightDigit,
+  provinces
 }: {
   numbers: string[]
   isTwoRow: boolean
-  textStyle: any
+    textStyle: TextStyle
   region: Region
   prizeKey: PrizeKey
   getLiveState: (num: string, idx: number) => 'DONE' | 'ROLLING' | 'PENDING' | 'NEW',
     displayMode: DisplayMode,
-    highlightDigit?: number | null
+    highlightDigit?: number | null,
+    provinces: LotteryResult[]
 }) {
   const renderLiveNumber = (num: string, idx: number) => (
     <View key={`${idx}`} style={{ justifyContent: "center", alignItems: "center", marginVertical: 2 }}>
@@ -40,6 +42,7 @@ function PrizeNumbers({
         region={region}
         displayMode={displayMode}
         highlightDigit={highlightDigit}
+        provinceCount={provinces.length}
       />
     </View>
   )
@@ -77,6 +80,8 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
   const { themed, theme: { colors } } = useAppTheme()
 
   const recentlyAdded = useAppSelector(state => state.lottery.recentlyAdded)
+  const userFontSize = useAppSelector(state => state.auth.user?.settingApp?.fontSize as FontSizeLevel) || 'MEDIUM'
+  const typography = getLotteryTypography(userFontSize)
   const isNorth = region === "north"
   const isDB = prize === "DB"
   const displayPrize = isDB ? "ĐB" : (prize.startsWith("G") ? `${prize[0]}.${prize[1]}` : prize)
@@ -147,7 +152,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
 
     const textStyle = {
       color: isDB || isHighlighted ? colors.primary : colors.text,
-      ...(isDB ? LOTTERY_TYPOGRAPHY.db : LOTTERY_TYPOGRAPHY.standard),
+      ...(isDB ? typography.db : typography.standard),
     }
 
     if (isNorth && ["G3", "G5"].includes(prize)) {
@@ -161,6 +166,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
           prizeKey={prize}
           displayMode={displayMode}
           highlightDigit={highlightDigit}
+          provinces={provinces}
         />
       )
     }
@@ -177,6 +183,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
               region={region!}
               displayMode={displayMode}
               highlightDigit={highlightDigit}
+              provinceCount={provinces.length}
             />
           </View>
         ))}
@@ -192,7 +199,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
           text={displayPrize}
           style={{
             color: isDB ? '#854D0E' : colors.textDim,
-            ...(isDB ? LOTTERY_TYPOGRAPHY.prizeLabelDB : LOTTERY_TYPOGRAPHY.prizeLabel)
+            ...(isDB ? typography.prizeLabelDB : typography.prizeLabel)
           }}
         />
       </View>
@@ -238,7 +245,6 @@ const $cellPricingWrapper: ThemedStyle<ViewStyle> = ({ colors }) => ({
 const $cellNumberWrapper: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
   alignItems: "center",
-  minWidth: 35,
   paddingVertical: 1,
 })
 const $cellProvinceWrapper: ThemedStyle<ViewStyle> = ({ colors }) => ({

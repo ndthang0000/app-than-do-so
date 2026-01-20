@@ -3,7 +3,8 @@ import { TextStyle, View, ViewStyle } from "react-native";
 import { Text } from "../Text";
 import { ThemedStyle } from "@/theme/types";
 import { LotteryResult } from "@/store/slices/lotterySlice";
-import { PrizeKey } from "@/constants/lotteryTicket";
+import { PrizeKey, getLotteryTypography, FontSizeLevel } from "@/constants/lotteryTicket";
+import { useAppSelector } from "@/store";
 
 
 export type ProvinceResult = {
@@ -20,6 +21,14 @@ type Props = {
 
 export function HeaderRow({ provinces, flex }: Props) {
   const { themed, theme: { colors } } = useAppTheme();
+  const userFontSize = useAppSelector(state => state.auth.user?.settingApp?.fontSize as FontSizeLevel) || 'MEDIUM';
+  const typography = getLotteryTypography(userFontSize);
+
+  const renderSpecialStation = (s: string) => {
+    if (s == 'Hậu Giang') return 'H.Giang';
+    if (s == 'Bình Phước') return 'B.Phước';
+    return s
+  }
 
   return (
     <View style={themed($wrapper)}>
@@ -28,7 +37,7 @@ export function HeaderRow({ provinces, flex }: Props) {
       </View>
       {provinces.map((p) => (
         <View key={p._id} style={[themed($cellWrapper), { flex: flex }]} >
-          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 18 }} text={p.station} />
+          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: typography.lotoHeader.fontSize, lineHeight: typography.lotoHeader.lineHeight }} text={renderSpecialStation(p.station)} />
         </View>
       ))}
     </View>
@@ -68,6 +77,7 @@ const $wrapper: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $textDai: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
   fontWeight: "600",
-  fontSize: 16,
+  fontSize: 15,
+  lineHeight: 20,
 })
 

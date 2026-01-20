@@ -4,8 +4,9 @@ import { Text } from "../Text";
 import LinearGradient from "react-native-linear-gradient"
 import { ThemedStyle } from "@/theme/types";
 import { useAppTheme } from "@/theme/context";
-import { Region } from "@/constants/lotteryTicket";
+import { Region, getLotteryTypography, FontSizeLevel } from "@/constants/lotteryTicket";
 import { LotteryResult } from "@/store/slices/lotterySlice";
+import { useAppSelector } from "@/store";
 
 type LotoTableProp = {
   provinces: LotteryResult[],
@@ -16,9 +17,11 @@ const head = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export const LotoTable = ({ provinces, region }: LotoTableProp) => {
   const { themed, theme: { colors } } = useAppTheme();
+  const userFontSize = useAppSelector(state => state.auth.user?.settingApp?.fontSize as FontSizeLevel) || 'MEDIUM';
+  const typography = getLotteryTypography(userFontSize);
 
   // Font chữ nhỏ hơn khi nhiều đài để tránh tràn dòng
-  const fontSizeTail = provinces.length > 3 ? 12 : 14;
+  const fontSizeTail = provinces.length > 3 ? typography.lotoNumber.fontSize - 2 : typography.lotoNumber.fontSize;
 
   return (
     <View style={themed($container)}>
@@ -29,21 +32,21 @@ export const LotoTable = ({ provinces, region }: LotoTableProp) => {
         style={themed($headerWrapper)}
       >
         <IconLoto width={24} height={24} color={colors.tint} />
-        <Text text="BẢNG LOTO ĐẦU ĐUÔI" style={{ fontSize: 18, fontWeight: "700", color: colors.tint }} />
+        <Text text="BẢNG LOTO ĐẦU ĐUÔI" style={{ fontSize: typography.lotoHeader.fontSize, fontWeight: typography.lotoHeader.fontWeight, color: colors.tint, lineHeight: typography.lotoHeader.lineHeight }} />
       </LinearGradient>
 
       <View style={themed($tableContent)}>
         {/* HÀNG HEADER: Chứa cột "Đầu" trống và tên các đài */}
         <View style={themed($rowItemWrapper)}>
           <View style={themed($headNumberWrapper)}>
-            <Text text="Đầu" style={{ fontSize: 12, color: colors.primary }} weight="bold" />
+            <Text text="Đầu" style={{ fontSize: typography.lotoStation.fontSize, color: colors.primary, lineHeight: typography.lotoStation.lineHeight }} weight="bold" />
           </View>
           {provinces.map((p) => (
             <View key={`header-${p._id}`} style={themed($tailNumberWrapper)}>
               <Text
                 text={p.station}
                 numberOfLines={1}
-                style={{ fontSize: 13, color: colors.primary, textAlign: "center" }}
+                style={{ fontSize: typography.lotoStation.fontSize, color: colors.primary, textAlign: "center", lineHeight: typography.lotoStation.lineHeight }}
                 weight="bold"
               />
             </View>
@@ -55,7 +58,7 @@ export const LotoTable = ({ provinces, region }: LotoTableProp) => {
           <View key={`row-${num}`} style={themed($rowItemWrapper)}>
             {/* Cột số Đầu cố định */}
             <View style={themed($headNumberWrapper)}>
-              <Text text={num} style={{ fontSize: 15, color: colors.palette.neutral700 }} weight="semiBold" />
+              <Text text={num} style={{ fontSize: typography.lotoNumber.fontSize + 1, color: colors.palette.neutral700, lineHeight: typography.lotoNumber.lineHeight }} weight="semiBold" />
             </View>
 
             {/* Các cột số Đuôi của từng đài */}
@@ -66,7 +69,8 @@ export const LotoTable = ({ provinces, region }: LotoTableProp) => {
                   style={{
                     fontSize: fontSizeTail,
                     color: colors.text,
-                    textAlign: "center"
+                    textAlign: "center",
+                    lineHeight: typography.lotoNumber.lineHeight
                   }}
                   weight="normal"
                 />

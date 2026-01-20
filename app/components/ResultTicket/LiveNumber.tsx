@@ -3,24 +3,32 @@ import { useEffect, useMemo, useState } from "react";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { Text } from "../Text";
 import { Image, ImageStyle, TextStyle, View, ViewStyle } from "react-native";
-import { BALL_COLORS, LOTTERY_NUMBER_LENGTH, PrizeKey, Region } from "@/constants/lotteryTicket";
+import { BALL_COLORS, LOTTERY_NUMBER_LENGTH, PrizeKey, Region, getLotteryTypography, FontSizeLevel } from "@/constants/lotteryTicket";
 import { DisplayMode } from "./LotteryResultTable";
+import { useAppSelector } from "@/store";
 
 export type NumberType = 'PENDING' | 'ROLLING' | 'NEW' | 'DONE';
 
-const SlotMachineTicker = ({ digitCount }: { digitCount: number }) => {
+const SlotMachineTicker = ({ digitCount, fontSize, provinceCount = 1 }: { digitCount: number, fontSize: FontSizeLevel, provinceCount?: number }) => {
   // Tạo mảng dựa trên số lượng chữ số của giải (vd: Giải Đặc biệt có 6 bóng)
   return (
     <View style={$ballRow}>
       {Array.from({ length: digitCount }).map((_, i) => (
-        <SingleBall key={i} />
+        <SingleBall key={i} fontSize={fontSize} provinceCount={provinceCount} />
       ))}
     </View>
   )
 }
 
-const SingleBall = () => {
+const SingleBall = ({ fontSize, provinceCount = 1 }: { fontSize: FontSizeLevel, provinceCount?: number }) => {
   const [num, setNum] = useState(0)
+  const typography = getLotteryTypography(fontSize);
+
+  // Điều chỉnh kích thước bóng dựa trên số lượng đài
+  const ballScale = provinceCount >= 4 ? 0.75 : provinceCount === 3 ? 0.85 : 1;
+  const ballWidth = 14 * ballScale;
+  const ballHeight = 18 * ballScale;
+  const adjustedFontSize = typography.ballText.fontSize * ballScale;
 
   // Chọn 1 màu ngẫu nhiên duy nhất khi trái bóng được khởi tạo (Mount)
   const randomBgColor = useMemo(() => {
@@ -35,23 +43,23 @@ const SingleBall = () => {
   }, [])
 
   return (
-    <View style={[$ballInner, { backgroundColor: randomBgColor }]}>
-      <Text text={num.toString()} style={[$ballText, { color: "white" }]} />
+    <View style={[$ballInner, { backgroundColor: randomBgColor, width: ballWidth, height: ballHeight, borderRadius: ballWidth / 2 }]}>
+      <Text text={num.toString()} style={[{ color: "white", fontSize: adjustedFontSize, fontWeight: typography.ballText.fontWeight, lineHeight: adjustedFontSize * 1.2 }]} />
     </View>
   )
 }
 
-export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayMode, highlightDigit }:
+export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayMode, highlightDigit, provinceCount = 1 }:
   {
     value: string,
     state: NumberType,
-    textStyle: any, prizeKey:
+    textStyle: TextStyle, prizeKey:
     PrizeKey, region: Region,
     displayMode: DisplayMode,
-    highlightDigit?: number | null
+    highlightDigit?: number | null,
+    provinceCount?: number
   }) => {
-  const { theme: { colors } } = useAppTheme();
-
+  const { theme: { colors } } = useAppTheme(); const userFontSize = useAppSelector(state => state.auth.user?.settingApp?.fontSize as FontSizeLevel) || 'MEDIUM';
   // Hiệu ứng nhấp nháy cho số vừa có kết quả (NEW)
   const scaleValue = useSharedValue(1);
   useEffect(() => {
@@ -73,7 +81,7 @@ export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayM
     } else if (displayMode === 'last3') {
       digitCount = 3;
     }
-    return <SlotMachineTicker digitCount={digitCount} />; // Hiệu ứng số chạy
+    return <SlotMachineTicker digitCount={digitCount} fontSize={userFontSize} provinceCount={provinceCount} />; // Hiệu ứng số chạy
   }
 
   if (state === 'PENDING' || value === '*') {
@@ -103,7 +111,7 @@ export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayM
       return (
         <Text style={textStyle}>
           {/* Phần đầu: không truyền prop text, dùng children */}
-          <Text style={textStyle}>{prefix}</Text>
+          {prefix && <Text style={textStyle} text={prefix} />}
 
           {/* Phần đuôi: highlight dùng children để nhận style lồng nhau */}
           <Text
@@ -112,9 +120,9 @@ export const LiveNumber = ({ value, state, textStyle, prizeKey, region, displayM
               color: colors.palette.accent100,
               backgroundColor: colors.gold,
             }}
-          >
-            {lastTwo}
-          </Text>
+            text={lastTwo}
+          />
+
         </Text>
       );
   }
@@ -153,14 +161,15 @@ const $gifContainer: ViewStyle = {
 }
 
 const $longCauImage: ImageStyle = {
-  width: 16, // Điều chỉnh kích thước phù hợp với ô kết quả của bạn
-  height: 16, //TODO: here
+  width: 15, // Điều chỉnh kích thước phù hợp với ô kết quả của bạn
+  height: 15, //TODO: here
 }
 
 const $ballRow: ViewStyle = {
   flexDirection: "row",
   justifyContent: "center",
   alignItems: "center",
+  gap: 0,
 }
 
 const $ballInner: ViewStyle = {
@@ -177,17 +186,4 @@ const $ballInner: ViewStyle = {
   shadowOpacity: 0.2,
   shadowRadius: 1,
   elevation: 2,
-}
-
-const $ballText: TextStyle = {
-  fontSize: 12,
-  color: "#FFFFFF", // Chữ trắng trên nền màu sẽ đẹp hơn
-  fontWeight: "900",
-  textAlign: "center",
-  // Fix lỗi căn giữa trên Android
-  includeFontPadding: false,
-  textAlignVertical: "center",
-  // Đảm bảo không bị lệch
-  padding: 0,
-  lineHeight: 12,
 }

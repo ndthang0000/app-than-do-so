@@ -40,29 +40,145 @@ export interface CheckAndSavePayload {
   durationScan: number;
 }
 
-export const LOTTERY_TYPOGRAPHY = {
-  db: {
-    fontSize: 21,      // To hơn để dễ đọc
-    fontWeight: "900", // Cực đậm
-    lineHeight: 32,
+// Font size config cho 3 cấp độ: SMALL, MEDIUM, LARGE
+export type FontSizeLevel = 'SMALL' | 'MEDIUM' | 'LARGE';
+
+export const LOTTERY_FONT_SIZE_CONFIG = {
+  SMALL: {
+    db: {
+      fontSize: 18,
+      fontWeight: "900" as const,
+      lineHeight: 20,
+    },
+    standard: {
+      fontSize: 18,
+      fontWeight: "800" as const,
+      lineHeight: 18,
+    },
+    prizeLabel: {
+      fontSize: 13,
+      fontWeight: "700" as const,
+      lineHeight: 16,
+    },
+    prizeLabelDB: {
+      fontSize: 16,
+      fontWeight: "800" as const,
+      lineHeight: 18,
+    },
+    lotoHeader: {
+      fontSize: 14,
+      fontWeight: "700" as const,
+      lineHeight: 19,
+    },
+    lotoNumber: {
+      fontSize: 12,
+      fontWeight: "normal" as const,
+      lineHeight: 16,
+    },
+    lotoStation: {
+      fontSize: 14,
+      fontWeight: "bold" as const,
+      lineHeight: 16,
+    },
+    ballText: {
+      fontSize: 15,
+      fontWeight: "bold" as const,
+      lineHeight: 18,
+    }
   },
-  standard: {
-    fontSize: 20,      // Tăng từ 16 lên 18
-    fontWeight: "800",
+  MEDIUM: {
+    db: {
+      fontSize: 20,
+      fontWeight: "900" as const,
+      lineHeight: 26,
+    },
+    standard: {
+      fontSize: 20,
+      fontWeight: "800" as const,
+      lineHeight: 19,
+    },
+    prizeLabel: {
+      fontSize: 15,
+      fontWeight: "700" as const,
+      lineHeight: 18,
+    },
+    prizeLabelDB: {
+      fontSize: 15,
+      fontWeight: "800" as const,
+      lineHeight: 20,
+    },
+    lotoHeader: {
+      fontSize: 16,
+      fontWeight: "700" as const,
+      lineHeight: 22,
+    },
+    lotoNumber: {
+      fontSize: 14,
+      fontWeight: "normal" as const,
+      lineHeight: 16,
+    },
+    lotoStation: {
+      fontSize: 12,
+      fontWeight: "bold" as const,
+      lineHeight: 16,
+    },
+    ballText: {
+      fontSize: 15,
+      fontWeight: "bold" as const,
+      lineHeight: 20,
+    }
   },
-  highlight: {
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  prizeLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  prizeLabelDB: {
-    fontSize: 18,
-    fontWeight: "800",
+  LARGE: {
+    db: {
+      fontSize: 20,
+      fontWeight: "900" as const,
+      lineHeight: 30,
+    },
+    standard: {
+      fontSize: 22,
+      fontWeight: "800" as const,
+      lineHeight: 22,
+    },
+    prizeLabel: {
+      fontSize: 15,
+      fontWeight: "700" as const,
+      lineHeight: 20,
+    },
+    prizeLabelDB: {
+      fontSize: 17,
+      fontWeight: "800" as const,
+      lineHeight: 24,
+    },
+    lotoHeader: {
+      fontSize: 18,
+      fontWeight: "700" as const,
+      lineHeight: 24,
+    },
+    lotoNumber: {
+      fontSize: 16,
+      fontWeight: "normal" as const,
+      lineHeight: 18,
+    },
+    lotoStation: {
+      fontSize: 16,
+      fontWeight: "bold" as const,
+      lineHeight: 18,
+    },
+    ballText: {
+      fontSize: 17,
+      fontWeight: "bold" as const,
+      lineHeight: 22,
+    }
   }
 } as const;
+
+// Helper function để lấy typography config theo fontSize level
+export const getLotteryTypography = (fontSize: FontSizeLevel = 'MEDIUM') => {
+  return LOTTERY_FONT_SIZE_CONFIG[fontSize];
+};
+
+// Legacy support - default MEDIUM
+export const LOTTERY_TYPOGRAPHY = LOTTERY_FONT_SIZE_CONFIG.MEDIUM;
 
 export const LOTTERY_NUMBER_LENGTH: Record<Region, Partial<Record<PrizeKey, number>>> = {
   north: {

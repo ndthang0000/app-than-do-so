@@ -22,9 +22,9 @@ import { syncNotificationSettings } from "@/services/notificationService";
 // --- SUB-COMPONENTS (Tách ra để code chính gọn hơn) ---
 
 const fontSizes = [
-  { label: 'Nhỏ', value: 'SMALL' },
-  { label: 'Vừa', value: 'MEDIUM' },
-  { label: 'Lớn', value: 'LARGE' },
+  { label: 'Nhỏ', value: 'SMALL', size: 'xs' },
+  { label: 'Vừa', value: 'MEDIUM', size: 'md' },
+  { label: 'Lớn', value: 'LARGE', size: 'xl' },
 ]
 
 const SettingRow = ({ icon: Icon, label, value, onToggle, themed, colors, disabled }: any) => (
@@ -91,6 +91,8 @@ export const ResultSettingsSheet = forwardRef((_, ref: any) => {
     const payload = {
       settingApp: { ...appSettings, ...newFields }
     };
+    //close bottom sheet after update
+    ref.current?.close();
     dispatch(optimisticUpdateAppSetting(newFields));
     dispatch(updateUserProfile(payload));
   };
@@ -161,7 +163,7 @@ export const ResultSettingsSheet = forwardRef((_, ref: any) => {
           <SettingRow label="Hiện bảng Loto" icon={IconTable} value={appSettings?.showLotoTable} themed={themed} colors={colors}
             onToggle={(val: any) => handleUpdateAppSetting({ showLotoTable: val })} />
 
-          <NumberSelector
+          {/* <NumberSelector
             label="Highlight Loto Đầu" icon={IconHead} themed={themed} disabled={isUpdating}
             selectedNumbers={appSettings?.highlightHead || []}
             onSelect={(num: string) => handleToggleHighlight(num, 'highlightHead')}
@@ -170,14 +172,14 @@ export const ResultSettingsSheet = forwardRef((_, ref: any) => {
             label="Highlight Loto Đuôi" icon={IconTail} themed={themed} disabled={isUpdating}
             selectedNumbers={appSettings?.highlightTail || []}
             onSelect={(num: string) => handleToggleHighlight(num, 'highlightTail')}
-          />
+          /> */}
         </View>
 
         <Text text="KÍCH THƯỚC CHỮ" style={themed($sectionLabel)} />
         <View style={themed($fontSizeCard)}>
-          {fontSizes.map(({ label, value }) => (
+          {fontSizes.map(({ label, value, size }) => (
             <TouchableOpacity key={label} style={[themed($sizeBtn), value === appSettings?.fontSize && themed($sizeBtnActive)]} onPress={() => handleUpdateAppSetting({ fontSize: value })}>
-              <Text text={label} size="sm" weight="medium" style={{ color: value === appSettings?.fontSize ? '#D90404' : '#999' }} />
+              <Text text={`𝓐𝒂` + label} size={size as any} weight="medium" style={{ color: value === appSettings?.fontSize ? '#D90404' : '#999' }} />
             </TouchableOpacity>
           ))}
         </View>
