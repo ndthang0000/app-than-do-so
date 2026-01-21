@@ -1,9 +1,9 @@
 import { useAppTheme } from "@/theme/context";
-import { TextStyle, View, ViewStyle } from "react-native";
+import { TextStyle, View, ViewStyle, TouchableOpacity } from "react-native";
 import { Text } from "../Text";
 import { ThemedStyle } from "@/theme/types";
 import { LotteryResult } from "@/store/slices/lotterySlice";
-import { PrizeKey, getLotteryTypography, FontSizeLevel } from "@/constants/lotteryTicket";
+import { PrizeKey, getLotteryTypography, FontSizeLevel, Region } from "@/constants/lotteryTicket";
 import { useAppSelector } from "@/store";
 
 
@@ -16,10 +16,12 @@ export type ProvinceResult = {
 
 type Props = {
   provinces: LotteryResult[],
-  flex: number
+  flex: number,
+  region?: Region,
+  onStationPress?: (station: string, region: Region) => void
 }
 
-export function HeaderRow({ provinces, flex }: Props) {
+export function HeaderRow({ provinces, flex, region, onStationPress }: Props) {
   const { themed, theme: { colors } } = useAppTheme();
   const userFontSize = useAppSelector(state => state.auth.user?.settingApp?.fontSize as FontSizeLevel) || 'MEDIUM';
   const typography = getLotteryTypography(userFontSize);
@@ -30,16 +32,34 @@ export function HeaderRow({ provinces, flex }: Props) {
     return s
   }
 
+  // Only make clickable for central and south regions
+  const isClickable = region && (region === 'central' || region === 'south') && onStationPress;
+
   return (
     <View style={themed($wrapper)}>
       <View style={themed($cellPricingWrapper)}>
         <Text style={themed($textDai)} text="Đài" />
       </View>
-      {provinces.map((p) => (
-        <View key={p._id} style={[themed($cellWrapper), { flex: flex }]} >
+      {provinces.map((p) => {
+        const stationContent = (
           <Text style={{ color: colors.primary, fontWeight: "700", fontSize: typography.lotoHeader.fontSize, lineHeight: typography.lotoHeader.lineHeight }} text={renderSpecialStation(p.station)} />
-        </View>
-      ))}
+        );
+
+        return isClickable ? (
+          <TouchableOpacity
+            key={p._id}
+            style={[themed($cellWrapper), { flex: flex }]}
+            onPress={() => onStationPress(p.station, region)}
+            activeOpacity={0.6}
+          >
+            {stationContent}
+          </TouchableOpacity>
+        ) : (
+          <View key={p._id} style={[themed($cellWrapper), { flex: flex }]} >
+            {stationContent}
+            </View>
+        );
+      })}
     </View>
   )
 }

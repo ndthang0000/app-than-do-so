@@ -25,6 +25,7 @@ import { ErrorOCRScreen } from "@/screens/ErrorOCR"
 import { TicketDetailScreen } from "@/screens/TicketDetailScreen"
 import { useEffect } from "react"
 import { loginByDevice } from "@/store/slices/authSlice"
+import { StationDetailScreen } from "@/screens/StationDetailScreen"
 
 /**
  * This is a list of all the route names that will exit the app if the back button
@@ -81,6 +82,7 @@ const AppStack = () => {
           <Stack.Screen name="Main" component={MainNavigator} />
           <Stack.Screen name="ErrorOCR" component={ErrorOCRScreen} />
           <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
+          <Stack.Screen name="StationDetail" component={StationDetailScreen} />
           <Stack.Screen name="ManualInput" component={ManualInputScreen} />
           <Stack.Screen name="Schedule" component={LotteryScheduleScreen} />
           <Stack.Screen name="Notification" component={NotificationScreen} />

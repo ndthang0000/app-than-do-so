@@ -51,9 +51,9 @@ export const LOTTERY_FONT_SIZE_CONFIG = {
       lineHeight: 20,
     },
     standard: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: "800" as const,
-      lineHeight: 18,
+      lineHeight: 16,
     },
     prizeLabel: {
       fontSize: 13,

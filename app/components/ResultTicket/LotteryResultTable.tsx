@@ -10,7 +10,7 @@ import { createDefaultLotteryData, PrizeKey, Region } from "@/constants/lotteryT
 import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
 import { useAppDispatch, useAppSelector } from "@/store"
 import { clearNewStatus, fetchLotteryIfNeeded, updateLotteryFromSocket } from "@/store/slices/lotterySlice"
-import { useIsFocused } from "@react-navigation/native"
+import { useIsFocused, useNavigation } from "@react-navigation/native"
 import { HeaderRowNorth } from "./HeaderRowNorth"
 import { socket } from "@/services/socket/socket"
 import Sound from 'react-native-sound';
@@ -22,7 +22,9 @@ export type DisplayMode = "full" | "last2" | "last3"
 
 type Props = {
   region: Region,
-  isLive: boolean
+  isLive: boolean,
+  station?: string // Optional: if provided, only show this station
+  date?: string // Optional: if provided, use this date instead of dateSelected from Redux
 }
 
 const PRIZES: PrizeKey[] = [
@@ -34,16 +36,27 @@ const PRIZES_NORTH: PrizeKey[] = [
 ]
 
 
-export const LotteryResultTable = memo(({ region, isLive }: Props) => {
+export const LotteryResultTable = memo(({ region, isLive, station, date }: Props) => {
 
   const $containerInsets = useSafeAreaInsetsStyle(["bottom"])
   const { themed, theme: { colors } } = useAppTheme();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("full")
   const dispatch = useAppDispatch()
   const isFocused = useIsFocused()
-  const dateSelected = useAppSelector((state) => state.lottery.dateSelected);
+  const navigation = useNavigation<any>()
+  const dateSelectedFromRedux = useAppSelector((state) => state.lottery.dateSelected);
+  const dateSelected = date || dateSelectedFromRedux; // Use prop date if provided, otherwise use Redux state
   const appSettings = useAppSelector((state) => state.auth.user?.settingApp);
-  const provinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || createDefaultLotteryData(region, dateSelected);
+  const allProvinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || createDefaultLotteryData(region, dateSelected);
+
+  // Filter provinces if station is specified
+  const provinces = useMemo(() => {
+    if (station) {
+      return allProvinces.filter(p => p.station === station);
+    }
+    return allProvinces;
+  }, [allProvinces, station]);
+
   const rollingSoundRef = useRef<Sound | null>(null);
   const newSoundRef = useRef<Sound | null>(null);
   const [isSoundReady, setIsSoundReady] = useState(false);
@@ -66,6 +79,15 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
   const choosePrizes = useMemo(() =>
     region === "north" ? PRIZES_NORTH : PRIZES,
     [region]);
+
+  // Navigation handler for station press (only for multi-station view)
+  const handleStationPress = station ? undefined : (stationName: string, stationRegion: Region) => {
+    navigation.navigate('StationDetail', {
+      station: stationName,
+      region: stationRegion,
+      date: dateSelected
+    });
+  };
 
   // Hàm trả lại âm lượng cũ
   const restoreVolume = () => {
@@ -245,7 +267,7 @@ export const LotteryResultTable = memo(({ region, isLive }: Props) => {
   return (
     <View style={[themed($tableWrapper), $containerInsets]}>
 
-      {region == "north" ? <HeaderRowNorth provinces={provinces} /> : <HeaderRow provinces={provinces} flex={calculateFlex} />}
+      {region == "north" ? <HeaderRowNorth provinces={provinces} /> : <HeaderRow provinces={provinces} flex={calculateFlex} region={region} onStationPress={handleStationPress} />}
       <View style={{ borderLeftWidth: 1, borderColor: colors.separator, borderBottomWidth: 1 }}>
 
         {
