@@ -72,6 +72,9 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
   }
   const isFinished = provinces.every(province => province.isFinished);
 
+  // Định nghĩa trạng thái LIVE thực sự: isLive = true VÀ chưa kết thúc
+  const isLiveActive = isLive && !isFinished;
+
   const calculateFlex = useMemo(() =>
     provinces.length === 3 ? 2 : (provinces.length === 1 ? 5 : 3),
     [provinces.length]);
@@ -95,8 +98,8 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
   };
 
   const playNewSoundWithDucking = (station: string, rank: string, value: string) => {
-    // Kiểm tra setting isVoiceEnabled
-    if (!appSettings?.isVoiceEnabled) return;
+    // Kiểm tra setting isVoiceEnabled và app phải ở foreground
+    if (!appSettings?.isVoiceEnabled || appState !== 'active') return;
 
     // 1. Giảm âm lượng nhạc nền xuống mức nhỏ để nghe tiếng chuông rõ hơn
     rollingSoundRef.current?.setVolume(0.1);
@@ -127,16 +130,16 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
   }, [dateSelected, dispatch, isFocused, appState])
 
   useEffect(() => {
-    if (appState !== "active" || isFinished) {
-      // Ứng dụng chuyển sang nền, tạm dừng nhạc
+    if (appState !== "active" || !isLiveActive) {
+    // Ứng dụng chuyển sang nền hoặc đã kết thúc, tạm dừng nhạc
       rollingSoundRef.current?.pause();
     } else {
-      // Ứng dụng trở lại foreground, nếu isLive và isMusicEnabled thì tiếp tục phát nhạc
-      if (isLive && appSettings?.isMusicEnabled) {
+      // Ứng dụng trở lại foreground, nếu isLiveActive và isMusicEnabled thì tiếp tục phát nhạc
+      if (isLiveActive && appSettings?.isMusicEnabled) {
         rollingSoundRef.current?.play();
       }
     }
-  }, [appState, isLive, isFinished, appSettings?.isMusicEnabled]);
+  }, [appState, isLiveActive, appSettings?.isMusicEnabled]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", nextAppState => {
@@ -149,8 +152,8 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
   }, []);
 
   useEffect(() => {
-    // 1. Kết nối
-    if (!isLive) return;
+    // 1. Kết nối - chỉ khi đang LIVE và chưa kết thúc
+    if (!isLiveActive) return;
     socket.connect();
 
     socket.on('connect', () => {
@@ -190,25 +193,25 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
 
     // Cleanup khi component unmount
     return () => {
-      if (!isLive) return;
+      if (!isLiveActive) return;
       socket.off('connect');
       socket.off('onLotteryChange');
       socket.disconnect();
     };
-  }, [isLive]);
+  }, [isLiveActive, region]);
 
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
 
     const startSound = () => {
-      if (isLive && isSoundReady && rollingSoundRef.current && isFocused && !isFinished && appSettings?.isMusicEnabled) {
+      if (isLiveActive && isSoundReady && rollingSoundRef.current && isFocused && appState === 'active' && appSettings?.isMusicEnabled) {
         // Đảm bảo volume mức cao
         rollingSoundRef.current.setVolume(0.5);
 
         rollingSoundRef.current.play((success) => {
           if (!success) {
-            // Nếu fail, thử lại 1 lần nữa sau 1 giây
+            // Nếu fail, thử lại 1 lần nữa sau 2 giây
             timer = setTimeout(() => rollingSoundRef.current?.play(), 2000);
           }
         });
@@ -224,10 +227,15 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
       clearTimeout(timer);
       rollingSoundRef.current?.pause();
     };
-  }, [isLive, isSoundReady, isFocused, isFinished, appSettings?.isMusicEnabled]); // Lắng nghe cả isReady (state báo load xong nhạc)
+  }, [isLiveActive, isSoundReady, isFocused, appState, appSettings?.isMusicEnabled]);
 
   useEffect(() => {
-    // KHỞI TẠO
+    // KHỞI TẠO - Chỉ load nhạc khi đang ở trạng thái LIVE
+    if (!isLiveActive) {
+      setIsSoundReady(false);
+      return;
+    }
+
     const sound = new Sound('longcau.mp3', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
         console.log('Lỗi load nhạc:', error);
@@ -254,8 +262,13 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
         rollingSoundRef.current.release();
         rollingSoundRef.current = null;
       }
+      if (newSoundRef.current) {
+        newSoundRef.current.release();
+        newSoundRef.current = null;
+      }
+      setIsSoundReady(false);
     };
-  }, []); // Chạy 1 lần duy nhất khi Mount
+  }, [isLiveActive]); // Chỉ load khi isLiveActive thay đổi
 
   useEffect(() => {
     const timer = setTimeout(() => setIsReady(true), 150); // Delay nhẹ để UI Date mượt hơn
