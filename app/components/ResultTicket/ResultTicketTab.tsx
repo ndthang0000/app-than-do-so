@@ -41,13 +41,13 @@ export const ResultTicketTab = memo(() => {
       }}
     >
       <Tab.Screen
-        name="Bac"
-        component={NorthResult}
+        name="Nam"
+        component={SouthResult}
         options={{
           tabBarLabel: ({ focused }) => (
             <AnimatedTabLabel
               focused={focused}
-              label="Miền Bắc"
+              label="Miền Nam"
               activeColor={colors.primary}
               inactiveColor={colors.textDim}
             />
@@ -69,19 +69,20 @@ export const ResultTicketTab = memo(() => {
         }}
       />
       <Tab.Screen
-        name="Nam"
-        component={SouthResult}
+        name="Bac"
+        component={NorthResult}
         options={{
           tabBarLabel: ({ focused }) => (
             <AnimatedTabLabel
               focused={focused}
-              label="Miền Nam"
+              label="Miền Bắc"
               activeColor={colors.primary}
               inactiveColor={colors.textDim}
             />
           )
         }}
       />
+
     </Tab.Navigator>
   )
 })

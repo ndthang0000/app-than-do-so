@@ -36,7 +36,7 @@ const initialState: LotteryState = {
  * Thunk: Lấy kết quả xổ số từ API
  */
 // Helper: Tái sử dụng logic tính toán Loto
-const processSingleProvinceLoto = (p: any) => {
+export const processSingleProvinceLoto = (p: any) => {
   const province = { ...p, loto: {} as Record<string, string[]> }
   if (!province.prizes) return province
   const lotoSet = new Set<string>()

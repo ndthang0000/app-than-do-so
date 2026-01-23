@@ -9,7 +9,7 @@ import { LotoTable } from "./LotoTable"
 import { createDefaultLotteryData, PrizeKey, Region } from "@/constants/lotteryTicket"
 import { DisplayModeToggleV2 } from "./DisplayModeToggleV2"
 import { useAppDispatch, useAppSelector } from "@/store"
-import { clearNewStatus, fetchLotteryIfNeeded, updateLotteryFromSocket } from "@/store/slices/lotterySlice"
+import { clearNewStatus, fetchLotteryIfNeeded, LotteryResult, updateLotteryFromSocket } from "@/store/slices/lotterySlice"
 import { useIsFocused, useNavigation } from "@react-navigation/native"
 import { HeaderRowNorth } from "./HeaderRowNorth"
 import { socket } from "@/services/socket/socket"
@@ -25,7 +25,10 @@ type Props = {
   isLive: boolean,
   station?: string // Optional: if provided, only show this station
   date?: string // Optional: if provided, use this date instead of dateSelected from Redux
+  provinces?: LotteryResult[] // Optional: if provided, use this data instead of fetching from Redux
+  winDetails?: PrizeKey[] // Optional: array of winning prizes to highlight
 }
+
 
 const PRIZES: PrizeKey[] = [
   "G8", "G7", "G6", "G5", "G4", "G3", "G2", "G1", "DB"
@@ -36,7 +39,7 @@ const PRIZES_NORTH: PrizeKey[] = [
 ]
 
 
-export const LotteryResultTable = memo(({ region, isLive, station, date }: Props) => {
+export const LotteryResultTable = memo(({ region, isLive, station, date, provinces: provincesProp, winDetails }: Props) => {
 
   const $containerInsets = useSafeAreaInsetsStyle(["bottom"])
   const { themed, theme: { colors } } = useAppTheme();
@@ -47,7 +50,7 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
   const dateSelectedFromRedux = useAppSelector((state) => state.lottery.dateSelected);
   const dateSelected = date || dateSelectedFromRedux; // Use prop date if provided, otherwise use Redux state
   const appSettings = useAppSelector((state) => state.auth.user?.settingApp);
-  const allProvinces = useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || createDefaultLotteryData(region, dateSelected);
+  const allProvinces = provincesProp || useAppSelector((state) => state.lottery.results[`${region}_${dateSelected}`]) || createDefaultLotteryData(region, dateSelected);
 
   // Filter provinces if station is specified
   const provinces = useMemo(() => {
@@ -295,6 +298,7 @@ export const LotteryResultTable = memo(({ region, isLive, station, date }: Props
               displayMode={displayMode}
               isLive={isLive}
               highlightDigit={highlightDigit}
+              winDetails={winDetails}
             />
           ))
         }

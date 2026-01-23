@@ -67,7 +67,6 @@ const createDefaultStats = () => ({
   dateBest: { value: "", freq: 0 },
 });
 
-console.log({ screenWidth, screenHeight, FRAME_WIDTH, FRAME_HEIGHT });
 
 const toastConfig = {
   info: ({ text1, text2 }: any) => {

@@ -36,6 +36,7 @@ import { persistor, store } from "./store"
 import { PersistGate } from "redux-persist/lib/integration/react"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { createNotificationChannel, setupCloudMessaging } from "./services/notificationService"
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet'
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -134,11 +135,13 @@ export function App() {
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>
             <KeyboardProvider>
               <ThemeProvider >
-                <AppNavigator
-                  linking={linking}
-                  initialState={initialNavigationState}
-                  onStateChange={onNavigationStateChange}
-                />
+                <BottomSheetModalProvider>
+                  <AppNavigator
+                    linking={linking}
+                    initialState={initialNavigationState}
+                    onStateChange={onNavigationStateChange}
+                  />
+                </BottomSheetModalProvider>
               </ThemeProvider>
             </KeyboardProvider>
           </SafeAreaProvider>

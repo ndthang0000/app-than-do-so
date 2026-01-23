@@ -6,7 +6,6 @@ import { App } from "@/app"
 // 1. Đăng ký xử lý thông báo chạy ngầm (Background/Quit)
 // Lưu ý: Phải đặt TRƯỚC registerRootComponent
 messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-  console.log('--- NHẬN DATA KHI APP ĐANG ĐÓNG ---');
   console.log('Payload:', remoteMessage.data);
 
   // Bạn có thể xử lý logic như lưu vào Storage ngầm ở đây

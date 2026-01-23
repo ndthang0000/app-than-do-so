@@ -94,6 +94,14 @@ export const getRegionStatus = (region: string): DrawStatus => {
   return { type: 'FINISHED', targetTime: regionTime };
 };
 
+export const getRegionByStation = (station: string): Region => {
+  for (const regionData of LOTTERY_SCHEDULE) {
+    if (regionData.schedule.some(s => s.provinces.includes(station))) {
+      return regionData.region;
+    }
+  }
+  return 'north';
+}
 // Chuyển sang mảng các chuỗi để tính khoảng cách Levenshtein
 export const FUZZY_PROVINCE_KEYWORDS: Record<string, string[]> = {
   // MIỀN NAM

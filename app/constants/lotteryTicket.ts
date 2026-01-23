@@ -66,8 +66,8 @@ export const LOTTERY_FONT_SIZE_CONFIG = {
       lineHeight: 18,
     },
     lotoHeader: {
-      fontSize: 14,
-      fontWeight: "700" as const,
+      fontSize: 17,
+      fontWeight: "800" as const,
       lineHeight: 19,
     },
     lotoNumber: {
@@ -108,14 +108,14 @@ export const LOTTERY_FONT_SIZE_CONFIG = {
       lineHeight: 20,
     },
     lotoHeader: {
-      fontSize: 16,
-      fontWeight: "700" as const,
-      lineHeight: 22,
+      fontSize: 18,
+      fontWeight: "800" as const,
+      lineHeight: 24,
     },
     lotoNumber: {
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: "normal" as const,
-      lineHeight: 16,
+      lineHeight: 18,
     },
     lotoStation: {
       fontSize: 12,
@@ -150,8 +150,8 @@ export const LOTTERY_FONT_SIZE_CONFIG = {
       lineHeight: 24,
     },
     lotoHeader: {
-      fontSize: 18,
-      fontWeight: "700" as const,
+      fontSize: 19,
+      fontWeight: "800" as const,
       lineHeight: 24,
     },
     lotoNumber: {

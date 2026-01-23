@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, TouchableOpacity, ViewStyle, TextStyle, Modal, FlatList, Dimensions } from "react-native";
+import { View, TouchableOpacity, ViewStyle, TextStyle } from "react-native";
 import { Header } from "@/components/Header";
 import { Text } from "@/components/Text";
 import { Screen } from "@/components/Screen";
@@ -14,13 +14,14 @@ import { format, subDays, addDays, isAfter, startOfDay, parseISO, getDay } from 
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import Toast from "react-native-toast-message";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { fetchLotteryIfNeeded, setDateSelected } from "@/store/slices/lotterySlice";
+import { fetchLotteryIfNeeded } from "@/store/slices/lotterySlice";
 import { LotteryResultTable } from "@/components/ResultTicket/LotteryResultTable";
-import { LOTTERY_SCHEDULE } from "@/constants/lotterySchedule";
+import { getRegionByStation, LOTTERY_SCHEDULE } from "@/constants/lotterySchedule";
 import { Region, Weekday } from "@/constants/lotteryTicket";
 import { shallowEqual } from "react-redux";
 import { CountDownDraw } from "@/components/ResultTicket/CountDownDraw";
 import { isToday } from "date-fns";
+import { StationBottomSheet } from "@/components/StationBottomSheet";
 
 interface StationInfo {
   name: string;
@@ -77,6 +78,22 @@ const findPreviousValidDate = (station: string, region: Region, fromDate: Date):
   return null;
 };
 
+// Find most recent valid date when station has lottery (today or before)
+const findMostRecentValidDate = (station: string, region: Region): Date | null => {
+  let date = new Date();
+  let attempts = 0;
+
+  while (attempts < 30) { // Search up to 30 days back
+    if (isStationActiveOnDate(station, region, date)) {
+      return date;
+    }
+    date = subDays(date, 1);
+    attempts++;
+  }
+
+  return null;
+};
+
 // Get all stations grouped by region
 const getStationsByRegion = (region: Region): string[] => {
   const schedule = LOTTERY_SCHEDULE.find(s => s.region === region);
@@ -99,7 +116,12 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
 
   const [selectedStation, setSelectedStation] = useState(initialStation);
   const [selectedRegion, setSelectedRegion] = useState<Region>(initialRegion as Region);
-  const [currentDate, setCurrentDate] = useState(initialDate || format(new Date(), "yyyy-MM-dd"));
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (initialDate) return initialDate;
+    // Find most recent valid date for this station
+    const mostRecentDate = findMostRecentValidDate(initialStation, initialRegion as Region);
+    return mostRecentDate ? format(mostRecentDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+  });
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isStationDropdownVisible, setStationDropdownVisible] = useState(false);
 
@@ -142,7 +164,6 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
     if (newIndex === 0 && previousValidDate) {
       // Swiped to previous
       setCurrentDate(previousValidDate);
-      dispatch(setDateSelected(previousValidDate));
       // Reset to middle page
       setTimeout(() => {
         pagerRef.current?.setPageWithoutAnimation(1);
@@ -150,13 +171,12 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
     } else if (newIndex === 2 && nextValidDate) {
       // Swiped to next
       setCurrentDate(nextValidDate);
-      dispatch(setDateSelected(nextValidDate));
       // Reset to middle page
       setTimeout(() => {
         pagerRef.current?.setPageWithoutAnimation(1);
       }, 50);
     }
-  }, [previousValidDate, nextValidDate, dispatch]);
+  }, [previousValidDate, nextValidDate]);
 
   // Handle date picker
   const showDatePicker = () => {
@@ -191,7 +211,6 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
 
     const dateString = format(date, "yyyy-MM-dd");
     setCurrentDate(dateString);
-    dispatch(setDateSelected(dateString));
 
     // Reset to middle page with new date
     setTimeout(() => {
@@ -215,7 +234,6 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
     if (isStationActiveOnDate(station, selectedRegion, validDate)) {
       const dateString = format(validDate, "yyyy-MM-dd");
       setCurrentDate(dateString);
-      dispatch(setDateSelected(dateString));
       setTimeout(() => {
         pagerRef.current?.setPageWithoutAnimation(1);
       }, 100);
@@ -255,6 +273,12 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
       }));
     }
   }, [currentDate, selectedRegion, selectedStation, dispatch, isLive, previousValidDate, nextValidDate]);
+
+  useEffect(() => {
+    setSelectedRegion(getRegionByStation(selectedStation));
+
+  }, [selectedStation]);
+
 
   const BackIcon = () => (
     <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ padding: 8 }}>
@@ -305,7 +329,7 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
         onPageSelected={handlePageSelected}
       >
         {/* Previous page */}
-        <View key={previousValidDate} style={{ flex: 1 }}>
+        <View key={`${selectedStation}-${previousValidDate}-prev`} style={{ flex: 1 }}>
           {previousValidDate ? (
             <Screen
               preset="scroll"
@@ -328,7 +352,7 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
         </View>
 
         {/* Current page */}
-        <View key={currentDate} style={{ flex: 1 }}>
+        <View key={`${selectedStation}-${currentDate}-current`} style={{ flex: 1 }}>
           <Screen
             preset="scroll"
             safeAreaEdges={["bottom"]}
@@ -353,7 +377,7 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
         </View>
 
         {/* Next page */}
-        <View key={nextValidDate} style={{ flex: 1 }}>
+        <View key={`${selectedStation}-${nextValidDate}-next`} style={{ flex: 1 }}>
           {nextValidDate ? (
             <Screen
               preset="scroll"
@@ -376,10 +400,7 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
         </View>
       </PagerView>
 
-      {/* Date Picker Modal 
-          Note: react-native-modal-datetime-picker doesn't support disabling specific dates.
-          Validation is done in handleConfirmDate to check if station has lottery on selected date.
-      */}
+
       <DateTimePickerModal
         isVisible={isDatePickerVisible}
         mode="date"
@@ -389,48 +410,14 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
         maximumDate={new Date()}
       />
 
-      {/* Station Dropdown Modal */}
-      <Modal
+      {/* Station Bottom Sheet */}
+      <StationBottomSheet
         visible={isStationDropdownVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setStationDropdownVisible(false)}
-      >
-        <TouchableOpacity
-          style={themed($modalOverlay)}
-          activeOpacity={1}
-          onPress={() => setStationDropdownVisible(false)}
-        >
-          <View style={themed($dropdownContainer)}>
-            <View style={themed($dropdownHeader)}>
-              <Text style={themed($dropdownTitle)}>Chọn đài</Text>
-            </View>
-            <FlatList
-              data={availableStations}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={themed($dropdownItem)}
-                  onPress={() => handleStationSelect(item)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      themed($dropdownItemText),
-                      item === selectedStation && themed($dropdownItemTextSelected)
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                  {item === selectedStation && (
-                    <Text style={themed($dropdownItemCheck)}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        onClose={() => setStationDropdownVisible(false)}
+        stations={availableStations}
+        selectedStation={selectedStation}
+        onSelectStation={handleStationSelect}
+      />
     </View>
   );
 };
@@ -447,10 +434,10 @@ const $stationDropdownFull: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
-  backgroundColor: colors.background,
+  backgroundColor: colors.surface,
   paddingHorizontal: spacing.md,
   paddingVertical: spacing.sm,
-  borderRadius: 8,
+  borderRadius: spacing.lg,
   borderWidth: 1,
   borderColor: colors.separator,
 });
@@ -462,108 +449,7 @@ const $stationDropdownTextFull: ThemedStyle<TextStyle> = ({ colors }) => ({
   flex: 1,
 });
 
-const $controlsContainer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.sm,
-  backgroundColor: colors.surface,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-});
-
-const $dateDisplay: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  backgroundColor: colors.background,
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.xs,
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: colors.separator,
-});
-
-const $dateText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  fontSize: 15,
-  fontWeight: "600",
-  color: colors.text,
-});
-
-const $stationDropdown: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  backgroundColor: colors.background,
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.xs,
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: colors.separator,
-  maxWidth: 180,
-  gap: spacing.xs,
-});
-
-const $stationDropdownText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  fontSize: 15,
-  fontWeight: "600",
-  color: colors.text,
-  flex: 1,
-});
-
 const $tableContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   // paddingHorizontal: spacing.md,
   // paddingTop: spacing.sm,
-});
-
-const $modalOverlay: ThemedStyle<ViewStyle> = () => ({
-  flex: 1,
-  backgroundColor: "rgba(0, 0, 0, 0.5)",
-  justifyContent: "center",
-  alignItems: "center",
-});
-
-const $dropdownContainer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  backgroundColor: colors.surface,
-  borderRadius: 12,
-  width: "80%",
-  maxHeight: "60%",
-  overflow: "hidden",
-});
-
-const $dropdownHeader: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  paddingVertical: spacing.md,
-  paddingHorizontal: spacing.md,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-});
-
-const $dropdownTitle: ThemedStyle<TextStyle> = ({ colors }) => ({
-  fontSize: 18,
-  fontWeight: "bold",
-  color: colors.text,
-  textAlign: "center",
-});
-
-const $dropdownItem: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  paddingVertical: spacing.md,
-  paddingHorizontal: spacing.md,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-});
-
-const $dropdownItemText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  fontSize: 16,
-  color: colors.text,
-});
-
-const $dropdownItemTextSelected: ThemedStyle<TextStyle> = ({ colors }) => ({
-  fontWeight: "bold",
-  color: colors.primary,
-});
-
-const $dropdownItemCheck: ThemedStyle<TextStyle> = ({ colors }) => ({
-  fontSize: 18,
-  fontWeight: "bold",
-  color: colors.primary,
 });

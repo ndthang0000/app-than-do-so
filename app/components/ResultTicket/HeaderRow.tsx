@@ -29,6 +29,7 @@ export function HeaderRow({ provinces, flex, region, onStationPress }: Props) {
   const renderSpecialStation = (s: string) => {
     if (s == 'Hậu Giang') return 'H.Giang';
     if (s == 'Bình Phước') return 'B.Phước';
+    if (s == 'Quảng Ngãi') return 'Q.Ngãi';
     return s
   }
 

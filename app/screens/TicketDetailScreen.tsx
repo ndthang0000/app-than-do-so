@@ -18,11 +18,14 @@ import { Ticket } from '@/store/slices/ticketSlice';
 import { formatVietnameseMoney } from '@/utils/formatMoney';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { syncNotificationSettings } from '@/services/notificationService';
+import { LotteryResultTable } from '@/components/ResultTicket/LotteryResultTable';
+import { LotteryResult, processSingleProvinceLoto } from '@/store/slices/lotterySlice';
 
 export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> = function TicketDetailScreen(_props) {
   const { navigation, route } = _props;
   const { ticketId, source } = route.params;
   const { themed, theme: { colors, spacing } } = useAppTheme();
+  const dispatch = useAppDispatch();
 
   const user = useAppSelector((state) => state.auth.user);
   const isSubscribed = user?.settingNotifications?.ticketResult;
@@ -37,23 +40,36 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
   const ticketFromStore = useAppSelector((state) =>
     state.ticket.tickets.find((t) => t._id === ticketId)
   );
-  const dispatch = useAppDispatch();
 
-const handleConfirmSubscription = async () => {
-  // Hiển thị loading nếu muốn (tùy chọn)
-  
-  const result = await syncNotificationSettings(dispatch, user?.settingNotifications, {
-    ticketResult: true // Bật trạng thái nhận thông báo vé
-  });
+  const provinces: LotteryResult = useMemo(() => {
+    const data = {
+      station: ticket?.station || '',
+      prizes: ticket?.prizes || {},
+      region: ticket?.region || 'north',
+      _id: ticket?._id || '',
+      date: ticket?.date || '',
+      isFinished: true,
+      type: '',
+      updatedAt: ticket?.updatedAt || '',
+    }
+    return processSingleProvinceLoto(data);
+  }, [ticket]);
 
-  if (result.success) {
-    bottomSheetRef.current?.close();
-    // Toast thông báo thành công
-  } else {
-    // Xử lý lỗi (ví dụ: người dùng từ chối quyền)
-    alert("Không thể bật thông báo. Vui lòng kiểm tra cài đặt thiết bị.");
-  }
-};
+  const handleConfirmSubscription = async () => {
+    // Hiển thị loading nếu muốn (tùy chọn)
+
+    const result = await syncNotificationSettings(dispatch, user?.settingNotifications, {
+      ticketResult: true // Bật trạng thái nhận thông báo vé
+    });
+
+    if (result.success) {
+      bottomSheetRef.current?.close();
+      // Toast thông báo thành công
+    } else {
+      // Xử lý lỗi (ví dụ: người dùng từ chối quyền)
+      alert("Không thể bật thông báo. Vui lòng kiểm tra cài đặt thiết bị.");
+    }
+  };
 
   useEffect(() => {
     if (ticketFromStore) {
@@ -142,10 +158,10 @@ const handleConfirmSubscription = async () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {isWin && (
-        <ConfettiCannon 
+        <ConfettiCannon
           count={300}           // Số lượng mảnh pháo
-          origin={{x: -10, y: 0}} // Vị trí bắt đầu (thường là đỉnh màn hình)
-          autoStart={true} 
+          origin={{ x: -10, y: 0 }} // Vị trí bắt đầu (thường là đỉnh màn hình)
+          autoStart={true}
           fadeOut={true}        // Tự động mờ dần
           fallSpeed={1000}      // Tốc độ rơi
           colors={['#FBBF24', '#22C55E', '#FFFFFF', '#FF0000']} // Màu sắc pháo hoa
@@ -160,7 +176,7 @@ const handleConfirmSubscription = async () => {
       />
       <Screen preset="scroll" style={themed($container)}>
         <View style={themed($mainContent)}>
-          
+
           <View style={themed($ticketCard)}>
             <View style={themed($ticketBody)}>
               <Text text={ticket.station} style={themed($stationText)} size='xxl' />
@@ -242,7 +258,16 @@ const handleConfirmSubscription = async () => {
               </TouchableOpacity>
             )
           }
-
+          <View style={{ marginTop: spacing.md }}>
+            <LotteryResultTable
+              region={ticket.region}
+              isLive={false}
+              station={ticket.station}
+              date={ticket.date}
+              provinces={[provinces]}
+              winDetails={ticket.winDetails as any}
+            />
+          </View>
         </View>
       </Screen>
 
@@ -272,11 +297,11 @@ const handleConfirmSubscription = async () => {
         </BottomSheetView>
       </BottomSheet>
       {isWin && (
-  <>
-    <ConfettiCannon count={100} origin={{x: 0, y: 600}} explosionSpeed={350} />
-    <ConfettiCannon count={100} origin={{x: 400, y: 600}} explosionSpeed={350} />
-  </>
-)}
+        <>
+          <ConfettiCannon count={100} origin={{ x: 0, y: 600 }} explosionSpeed={350} />
+          <ConfettiCannon count={100} origin={{ x: 400, y: 600 }} explosionSpeed={350} />
+        </>
+      )}
     </View>
   );
 };
@@ -332,7 +357,8 @@ const $headerTitle: ThemedStyle<TextStyle> = ({ colors }) => ({
   fontSize: 18,
 });
 const $mainContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  padding: spacing.md,
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.sm,
 });
 const $ticketCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   backgroundColor: '#2D2D1C',
@@ -396,7 +422,7 @@ const $loadingContainer: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: "#1A1A10",
 })
 
-const $moneyWrapper: ThemedStyle<ViewStyle> = ({ spacing,colors }) => ({
+const $moneyWrapper: ThemedStyle<ViewStyle> = ({ spacing, colors }) => ({
   flexDirection: 'row',
   alignItems: 'center',
   marginTop: spacing.xs,

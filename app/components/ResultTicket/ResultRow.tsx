@@ -20,7 +20,8 @@ function PrizeNumbers({
   prizeKey,
   displayMode,
   highlightDigit,
-  provinces
+  provinces,
+  provinceId
 }: {
   numbers: string[]
   isTwoRow: boolean
@@ -30,10 +31,11 @@ function PrizeNumbers({
   getLiveState: (num: string, idx: number) => 'DONE' | 'ROLLING' | 'PENDING' | 'NEW',
     displayMode: DisplayMode,
     highlightDigit?: number | null,
-    provinces: LotteryResult[]
+    provinces: LotteryResult[],
+    provinceId: string
 }) {
   const renderLiveNumber = (num: string, idx: number) => (
-    <View key={`${idx}`} style={{ justifyContent: "center", alignItems: "center", marginVertical: 2 }}>
+    <View key={`${provinceId}-${prizeKey}-${idx}`} style={{ justifyContent: "center", alignItems: "center", marginVertical: 2 }}>
       <LiveNumber
         value={num}
         state={getLiveState(num, idx)}
@@ -67,7 +69,7 @@ function PrizeNumbers({
 }
 
 // --- Component chính ResultRow ---
-export function ResultRow({ prize, provinces, index, flex, region, displayMode, isLive, highlightDigit }: {
+export function ResultRow({ prize, provinces, index, flex, region, displayMode, isLive, highlightDigit, winDetails }: {
   provinces: LotteryResult[],
   region?: Region,
   prize: PrizeKey,
@@ -75,7 +77,8 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
   flex: number,
   isLive: boolean,
   displayMode: DisplayMode,
-  highlightDigit: number | null
+  highlightDigit: number | null,
+  winDetails?: PrizeKey[]
 }) {
   const { themed, theme: { colors } } = useAppTheme()
 
@@ -86,6 +89,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
   const isDB = prize === "DB"
   const displayPrize = isDB ? "ĐB" : (prize.startsWith("G") ? `${prize[0]}.${prize[1]}` : prize)
   const isHighlighted = (isNorth && prize === 'G7') || (!isNorth && prize === 'G8')
+  const isWinningPrize = winDetails?.includes(prize) || false
 
   // Xác định thứ tự xổ thực tế
   const prizeOrder: PrizeKey[] = isNorth
@@ -93,6 +97,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
     : ["G8", "G7", "G6", "G5", "G4", "G3", "G2", "G1", "DB"]
 
   const getBgColor = () => {
+    if (isWinningPrize) return "rgba(34, 197, 94, 0.15)" // Green highlight for winning prize
     if (isDB) return "#FCFBD9"
     return index % 2 === 0 ? colors.surface : colors.palette.neutral200
   }
@@ -155,6 +160,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
       ...(isDB ? typography.db : typography.standard),
     }
 
+    // Xử lý hiển thị nhiều dòng cho miền Bắc
     if (isNorth && ["G3", "G5"].includes(prize)) {
       return (
         <PrizeNumbers
@@ -167,14 +173,86 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
           displayMode={displayMode}
           highlightDigit={highlightDigit}
           provinces={provinces}
+          provinceId={p._id}
         />
       )
+    }
+
+    // Xử lý hiển thị nhiều dòng cho miền Trung/Nam khi chỉ có 1 đài
+    const isSingleProvince = provinces.length === 1
+    const isCentralOrSouth = !isNorth
+
+    if (isCentralOrSouth && isSingleProvince) {
+      // G6 hoặc G3: 3 số hoặc 2 số -> hiển thị 1 dòng
+      if ((prize === "G6" && displayNumbers.length === 3) || (prize === "G3" && displayNumbers.length === 2)) {
+        return (
+          <View style={{ flexDirection: "row", justifyContent: "space-evenly", width: "100%", paddingVertical: 6 }}>
+            {displayNumbers.map((num, idx) => (
+              <View key={`${p._id}-${prize}-${idx}`} style={{ justifyContent: "center", alignItems: "center" }}>
+                <LiveNumber
+                  value={num}
+                  state={getLiveState(num, idx)}
+                  textStyle={textStyle}
+                  prizeKey={prize}
+                  region={region!}
+                  displayMode={displayMode}
+                  highlightDigit={highlightDigit}
+                  provinceCount={provinces.length}
+                />
+              </View>
+            ))}
+          </View>
+        )
+      }
+
+      // G4: 7 số -> hiển thị 2 dòng (4 số + 3 số)
+      if (prize === "G4" && displayNumbers.length === 7) {
+        const firstRow = displayNumbers.slice(0, 4)
+        const secondRow = displayNumbers.slice(4, 7)
+
+        return (
+          <View style={{ flexDirection: "column", flex: 1, paddingVertical: 4 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-evenly", marginBottom: 4 }}>
+              {firstRow.map((num, idx) => (
+                <View key={`${p._id}-${prize}-${idx}`} style={{ justifyContent: "center", alignItems: "center" }}>
+                  <LiveNumber
+                    value={num}
+                    state={getLiveState(num, idx)}
+                    textStyle={textStyle}
+                    prizeKey={prize}
+                    region={region!}
+                    displayMode={displayMode}
+                    highlightDigit={highlightDigit}
+                    provinceCount={provinces.length}
+                  />
+                </View>
+              ))}
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-evenly" }}>
+              {secondRow.map((num, idx) => (
+                <View key={`${p._id}-${prize}-${idx + 4}`} style={{ justifyContent: "center", alignItems: "center" }}>
+                  <LiveNumber
+                    value={num}
+                    state={getLiveState(num, idx + 4)}
+                    textStyle={textStyle}
+                    prizeKey={prize}
+                    region={region!}
+                    displayMode={displayMode}
+                    highlightDigit={highlightDigit}
+                    provinceCount={provinces.length}
+                  />
+                </View>
+              ))}
+            </View>
+          </View>
+        )
+      }
     }
 
     return (
       <View style={isNorth ? themed($northNumbersContainer) : null}>
         {displayNumbers.map((num, idx) => (
-          <View key={`${idx}`} style={themed($cellNumberWrapper)}>
+          <View key={`${p._id}-${prize}-${idx}`} style={themed($cellNumberWrapper)}>
             <LiveNumber
               value={num}
               state={getLiveState(num, idx)}
@@ -198,7 +276,7 @@ export function ResultRow({ prize, provinces, index, flex, region, displayMode, 
         <Text
           text={displayPrize}
           style={{
-            color: isDB ? '#854D0E' : colors.textDim,
+            color: isWinningPrize ? '#16A34A' : (isDB ? '#854D0E' : colors.textDim),
             ...(isDB ? typography.prizeLabelDB : typography.prizeLabel)
           }}
         />
