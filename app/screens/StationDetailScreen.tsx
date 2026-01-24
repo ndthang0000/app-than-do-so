@@ -341,6 +341,8 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
                   isLive={false}
                   station={selectedStation}
                   date={previousValidDate}
+                  isShowHeader={false}
+
                 />
               </View>
             </Screen>
@@ -370,6 +372,7 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
                   isLive={isLive}
                   station={selectedStation}
                   date={currentDate}
+                    isShowHeader={false}
                 />
               </View>
             )}
@@ -389,6 +392,8 @@ export const StationDetailScreen: React.FC<AppStackScreenProps<'StationDetail'>>
                   isLive={false}
                   station={selectedStation}
                   date={nextValidDate}
+                  isShowHeader={false}
+
                 />
               </View>
             </Screen>

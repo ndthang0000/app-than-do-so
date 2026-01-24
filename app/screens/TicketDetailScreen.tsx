@@ -266,6 +266,7 @@ export const TicketDetailScreen: React.FC<AppStackScreenProps<'TicketDetail'>> =
               date={ticket.date}
               provinces={[provinces]}
               winDetails={ticket.winDetails as any}
+              isShowHeader={false}
             />
           </View>
         </View>

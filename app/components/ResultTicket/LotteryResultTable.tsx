@@ -27,6 +27,7 @@ type Props = {
   date?: string // Optional: if provided, use this date instead of dateSelected from Redux
   provinces?: LotteryResult[] // Optional: if provided, use this data instead of fetching from Redux
   winDetails?: PrizeKey[] // Optional: array of winning prizes to highlight
+  isShowHeader?: boolean // Optional: whether to show header row
 }
 
 
@@ -39,7 +40,7 @@ const PRIZES_NORTH: PrizeKey[] = [
 ]
 
 
-export const LotteryResultTable = memo(({ region, isLive, station, date, provinces: provincesProp, winDetails }: Props) => {
+export const LotteryResultTable = memo(({ region, isLive, station, date, provinces: provincesProp, winDetails, isShowHeader = true }: Props) => {
 
   const $containerInsets = useSafeAreaInsetsStyle(["bottom"])
   const { themed, theme: { colors } } = useAppTheme();
@@ -283,7 +284,7 @@ export const LotteryResultTable = memo(({ region, isLive, station, date, provinc
   return (
     <View style={[themed($tableWrapper), $containerInsets]}>
 
-      {region == "north" ? <HeaderRowNorth provinces={provinces} /> : <HeaderRow provinces={provinces} flex={calculateFlex} region={region} onStationPress={handleStationPress} />}
+      {isShowHeader && (region == "north" ? <HeaderRowNorth provinces={provinces} /> : (isShowHeader && <HeaderRow provinces={provinces} flex={calculateFlex} region={region} onStationPress={handleStationPress} />))}
       <View style={{ borderLeftWidth: 1, borderColor: colors.separator, borderBottomWidth: 1 }}>
 
         {
