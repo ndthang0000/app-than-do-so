@@ -17,6 +17,7 @@
   "android": {
     "icon": "./assets/images/app-icon-android-legacy.png",
     "package": "com.thandoso",
+    "googleServicesFile": "./google-services.json",
     "adaptiveIcon": {
       "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
       "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
@@ -27,7 +28,8 @@
   "ios": {
     "icon": "./assets/images/app-icon-ios.png",
     "supportsTablet": true,
-    "bundleIdentifier": "com.thandoso"
+    "bundleIdentifier": "com.thandoso",
+    "googleServicesFile": "./GoogleService-Info.plist"
   },
   "web": {
     "favicon": "./assets/images/app-icon-web-favicon.png",
@@ -54,7 +56,8 @@
         }
       }
     ],
-    "expo-build-properties"
+    "expo-build-properties",
+    "@react-native-firebase/app"
   ],
   "experiments": {
     "tsconfigPaths": true

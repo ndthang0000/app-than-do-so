@@ -100,7 +100,7 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
                 themed($scanLine),
                 {
                   transform: [{ translateY }],
-                  opacity, // Thêm hiệu ứng mờ ảo
+                  opacity,
                   backgroundColor: colors.primary
                 }
               ]}

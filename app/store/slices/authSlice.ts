@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit"
 import { api } from "@/services/api"
-import DeviceInfo from "react-native-device-info"
+import { v4 as uuidv4 } from 'uuid'
 import hmacSHA256 from "crypto-js/hmac-sha256"
 import Hex from "crypto-js/enc-hex"
 import { APP_CRYPTO_KEY } from '@env';
@@ -51,13 +51,22 @@ const initialState: AuthState = {
 }
 
 /**
+ * Helper: Lấy hoặc tạo deviceId từ AsyncStorage
+ */
+
+
+/**
  * Thunk: Thực hiện Auto Login bằng DeviceId + Signature
  */
 export const loginByDevice = createAsyncThunk(
   "auth/loginByDevice",
   async (_, { rejectWithValue }) => {
     try {
-      const deviceId = await DeviceInfo.getUniqueId()
+      if (!APP_CRYPTO_KEY) {
+        throw new Error("APP_CRYPTO_KEY is not defined in .env file");
+      }
+
+      const deviceId = uuidv4()
       const timestamp = Date.now()
 
       // Tạo Signature bảo mật để tránh spam tạo user ảo
@@ -100,16 +109,6 @@ export const updateUserProfile = createAsyncThunk(
     }
   }
 );
-
-(async () => {
-  const deviceId = await DeviceInfo.getUniqueId()
-  const timestamp = Date.now()
-
-  // Tạo Signature bảo mật để tránh spam tạo user ảo
-  const message = `${deviceId}|${timestamp}`
-  const signature = hmacSHA256(message, APP_CRYPTO_KEY).toString(Hex)
-  console.log({ deviceId, timestamp, signature })
-})()
 
 export const authSlice = createSlice({
   name: "auth",
