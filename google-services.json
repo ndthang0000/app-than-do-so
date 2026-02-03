@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1097406541376",
+    "project_id": "than-do-so-45704",
+    "storage_bucket": "than-do-so-45704.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1097406541376:android:99bb19ef0eab7a8dca39a5",
+        "android_client_info": {
+          "package_name": "com.thandoso"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkBds8tDMTaAlAa5a8feSf5g1jguRwoPM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

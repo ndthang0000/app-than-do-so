@@ -63,6 +63,7 @@ export const loginByDevice = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       if (!APP_CRYPTO_KEY) {
+        alert("Lỗi: Thiếu Crypto Key");
         throw new Error("APP_CRYPTO_KEY is not defined in .env file");
       }
 

@@ -26,7 +26,12 @@
       "extends": "production",
       "distribution": "internal",
       "ios": { "simulator": true },
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk",
+        "env": {
+          "APP_CRYPTO_KEY": "@APP_CRYPTO_KEY"
+        }
+      }
     },
     "preview:device": {
       "extends": "preview",
