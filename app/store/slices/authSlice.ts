@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit"
 import { api } from "@/services/api"
-import { v4 as uuidv4 } from 'uuid'
+import uuid from 'react-native-uuid';
 import hmacSHA256 from "crypto-js/hmac-sha256"
 import Hex from "crypto-js/enc-hex"
 import { APP_CRYPTO_KEY } from '@env';
@@ -66,7 +66,7 @@ export const loginByDevice = createAsyncThunk(
         throw new Error("APP_CRYPTO_KEY is not defined in .env file");
       }
 
-      const deviceId = uuidv4()
+      const deviceId = uuid.v4();
       const timestamp = Date.now()
 
       // Tạo Signature bảo mật để tránh spam tạo user ảo
