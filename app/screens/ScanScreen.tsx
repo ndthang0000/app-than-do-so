@@ -137,7 +137,7 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
       try {
         const photo = await camera.current.takePhoto({ flash: isFlashOn ? 'on' : 'off', enableShutterSound: false, });
         if (isMounted.current && isScanningActive && !isStoppingRef.current) {
-          processImageForOCR(photo.path, photo.width, photo.height);
+          processImageForOCR(photo.path, photo.width, photo.height, false); // Disable crop for auto-capture
         }
       } catch (err) {
         console.log("Capture error (Camera potentially closed)", err);
@@ -244,27 +244,47 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
     try {
       let finalUri = uri;
       if (shouldCrop) {
-        const scale = screenWidth / pW;
-        const { x, y, width, height } = frameLayout.current;
-        const offsetY = (screenHeight - (screenWidth * pH / pW)) / 2;
+        try {
+          // Conservative percentage-based cropping for gallery images
+          // Use very safe margins to handle potential EXIF rotation issues
+          const originXPercent = 0.1; // 10% margin from left
+          const originYPercent = 0.25; // 25% from top
+          const widthPercent = 0.8; // 80% of width (10% margin on each side)
+          const heightPercent = 0.5; // 50% of height
 
-        const crop = await ImageManipulator.manipulateAsync(uri, [
-          {
-            crop: {
-              originX: Math.max(0, x / scale),
-              originY: Math.max(0, (y - offsetY) / scale),
-              width: width / scale,
-              height: height / scale
-            }
-          },
-          { resize: { width: 1000 } }
-        ], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
-        finalUri = crop.uri;
+          const originX = Math.round(pW * originXPercent);
+          const originY = Math.round(pH * originYPercent);
+          const cropWidth = Math.round(pW * widthPercent);
+          const cropHeight = Math.round(pH * heightPercent);
+
+          // Double-check bounds (handle potential rotation)
+          if (originX + cropWidth <= pW && originY + cropHeight <= pH) {
+            console.log(`🔍 Gallery crop: origin=(${originX},${originY}) size=(${cropWidth}x${cropHeight}) image=(${pW}x${pH})`);
+
+            const crop = await ImageManipulator.manipulateAsync(uri, [
+              {
+                crop: {
+                  originX,
+                  originY,
+                  width: cropWidth,
+                  height: cropHeight
+                }
+              },
+              { resize: { width: 1200 } }
+            ], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
+            finalUri = crop.uri;
+            console.log("✅ Crop successful");
+          } else {
+            console.warn("⚠️ Crop would exceed bounds, using full image");
+          }
+        } catch (cropError) {
+          console.error("❌ Crop failed, using full image:", cropError);
+        }
       }
 
       const result = await PhotoRecognizer({ uri: finalUri });
       if (result?.resultText) {
-        handleProcessedOCR(result.resultText, 5, true); // Tặng 5 điểm tin cậy cho ảnh chụp
+        handleProcessedOCR(result.resultText, shouldCrop ? 3 : 5, true); // Higher weight for uncropped (auto-capture)
       }
     } catch (e) {
       console.error("OCR Photo Error:", e);
