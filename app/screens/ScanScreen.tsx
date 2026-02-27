@@ -67,32 +67,6 @@ const createDefaultStats = () => ({
   dateBest: { value: "", freq: 0 },
 });
 
-
-const toastConfig = {
-  info: ({ text1, text2 }: any) => {
-    const { theme: { colors } } = useAppTheme();
-    return (
-      <View style={{
-        height: 60,
-        width: '80%',
-        backgroundColor: colors.palette.neutral800,
-        borderRadius: 30,
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#FFD700', // Màu vàng primary của bạn
-        paddingHorizontal: 8
-      }}>
-        <Text style={{ color: colors.palette.accent300, fontWeight: 'bold', fontSize: 14 }} text={text1} />
-        {text2 &&
-          <Text style={{ color: colors.palette.accent200, fontSize: 12 }}>{text2}</Text>
-        }
-      </View>
-    )
-  }
-};
-
 export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScreen(_props) {
   const { navigation } = _props;
   const { themed, theme: { colors, spacing } } = useAppTheme();
@@ -557,7 +531,6 @@ export const ScanScreen: React.FC<HomeTabScreenProps<'Scan'>> = function ScanScr
         </View>
       </View>
         <ScanTipsSheet ref={tipsSheetRef} />
-        <Toast config={toastConfig} />
       </View>
     </BottomSheetModalProvider>
   );
