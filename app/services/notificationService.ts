@@ -133,15 +133,26 @@ const handleForegroundMessage = (remoteMessage: any) => {
 const handleNotificationAction = (remoteMessage: any) => {
   const data = remoteMessage.data;
   if (data?.screen === "Result") {
-    // Navigate trực tiếp bằng helper của Ignite
+    console.log('✅ Navigating to Result screen with region:', data.region);
+    
+    // Map region to tab screen name
+    const regionToTab = {
+      'north': 'Bac' as const,
+      'central': 'Trung' as const,
+      'south': 'Nam' as const,
+    };
+    const tabScreen = regionToTab[data.region as keyof typeof regionToTab] || 'Nam' as const;
+    
+    // Navigate to Result with correct nested tab
     navigate("Result", {
-      region: data.region
-    })
+      screen: tabScreen
+    });
   }
   else if (data?.screen === "TicketDetail") {
+    console.log('✅ Navigating to TicketDetail screen with ticketId:', data.ticketId);
     navigate("TicketDetail", {
       ticketId: data.ticketId,
       source: "notification"
-    })
+    });
   }
 };

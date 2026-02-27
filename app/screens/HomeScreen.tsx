@@ -141,8 +141,24 @@ export const HomeScreen: React.FC<HomeTabScreenProps<'Home'>> = function HomeScr
             const provinces = lotteryResults[region.regionCode as keyof typeof lotteryResults];
             const statusTag = getStatusTag(region.id as Region);
 
+            // Map region ID to tab screen name
+            const regionToTab = {
+              'north': 'Bac' as const,
+              'central': 'Trung' as const,
+              'south': 'Nam' as const,
+            };
+            const tabScreen = regionToTab[region.id as keyof typeof regionToTab] || 'Nam' as const;
+
             return (
-              <TouchableOpacity key={region.id} style={themed($resultItemWrapper)} onPress={() => navigation.navigate("Result", {})}>
+              <TouchableOpacity
+                key={region.id}
+                style={themed($resultItemWrapper)}
+                onPress={() => {
+                  navigation.navigate("Result", {
+                    screen: tabScreen
+                  });
+                }}
+              >
                 <View style={{ alignItems: 'center' }}>
                   <Image source={region.image} resizeMode="contain" style={themed($imageRegion)} />
                   <Text text={region.name} style={themed([$textRegion, { color: region.color }])} />

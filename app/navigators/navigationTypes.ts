@@ -15,13 +15,20 @@ export type DemoTabParamList = {
   DemoPodcastList: undefined
 }
 
+// Result screen nested tab navigator types
+export type ResultTabParamList = {
+  Nam: undefined  // Miền Nam
+  Trung: undefined  // Miền Trung
+  Bac: undefined  // Miền Bắc
+}
+
 export type HomeTabParamList = {
   DemoCommunity: undefined
   DemoShowroom: { queryIndex?: string; itemIndex?: string }
   DemoDebug: undefined
   DemoPodcastList: undefined
   Home: undefined
-  Result: { queryIndex?: string; itemIndex?: string }
+  Result: NavigatorScreenParams<ResultTabParamList>
   Scan: undefined
   MyTicket: undefined
   Account: undefined
