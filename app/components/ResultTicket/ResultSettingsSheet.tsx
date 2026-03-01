@@ -1,5 +1,5 @@
 import { ThemedStyle } from "@/theme/types";
-import { ScrollView, TextStyle, TouchableOpacity, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Linking, Modal, Platform, ScrollView, TextStyle, TouchableOpacity, View, ViewStyle } from "react-native";
 import { Text } from "../Text";
 import { Switch } from "../Toggle/Switch";
 import { useAppTheme } from "@/theme/context";
@@ -9,15 +9,18 @@ import IconBell from "@assets/svg/bell-active.svg";
 import IconClose from "@assets/svg/close.svg";
 import IconVoice from "@assets/svg/voice-on.svg";
 import IconTable from "@assets/svg/table.svg";
-import IconHead from "@assets/svg/palette.svg"; // Giả định icon đầu
-import IconTail from "@assets/svg/palette.svg"; // Giả định icon đuôi
+import IconHead from "@assets/svg/palette.svg";
+import IconTail from "@assets/svg/palette.svg";
 import IconMusic from "@assets/svg/music.svg";
 import IconDownload from "@assets/svg/download.svg";
 import IconShare from "@assets/svg/share.svg";
-import { forwardRef, useCallback, useMemo } from "react";
+import { RefObject, forwardRef, useCallback, useMemo, useState } from "react";
 import { optimisticUpdateAppSetting, optimisticUpdateNotiSetting, updateUserProfile } from '@/store/slices/authSlice';
 import Toast from "react-native-toast-message";
 import { syncNotificationSettings } from "@/services/notificationService";
+import { captureRef } from "react-native-view-shot";
+import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
 
 // --- SUB-COMPONENTS (Tách ra để code chính gọn hơn) ---
 
@@ -78,13 +81,94 @@ const NumberSelector = ({ label, icon: Icon, selectedNumbers, onSelect, themed, 
   </View>
 );
 
-export const ResultSettingsSheet = forwardRef((_, ref: any) => {
+interface ResultSettingsSheetProps {
+  captureRef?: RefObject<View | null>
+  onBeforeCapture?: () => Promise<void>
+  onAfterCapture?: () => void
+}
+
+export const ResultSettingsSheet = forwardRef(({ captureRef: captureViewRef, onBeforeCapture, onAfterCapture }: ResultSettingsSheetProps, ref: any) => {
   const { themed, theme: { colors } } = useAppTheme();
   const dispatch = useAppDispatch();
   const notiSettings = useAppSelector(state => state.auth.user?.settingNotifications);
   const appSettings = useAppSelector(state => state.auth.user?.settingApp);
   const isUpdating = useAppSelector(state => state.auth.isUpdating);
   const snapPoints = useMemo(() => ['75%'], []);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [savedAsset, setSavedAsset] = useState<MediaLibrary.Asset | null>(null);
+
+  // Open the exact saved image in the system viewer
+  const openGallery = async (asset: MediaLibrary.Asset) => {
+    try {
+      if (Platform.OS === 'ios') {
+        await Linking.openURL('photos-redirect://');
+      } else {
+        // asset.id is the MediaStore _id — construct the exact content:// URI for this image
+        const uri = `content://media/external/images/media/${asset.id}`;
+        await Linking.openURL(uri);
+      }
+    } catch (e) {
+      console.error('Open gallery error:', e);
+      Toast.show({ type: 'error', text1: 'Không thể mở ảnh' });
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Toast.show({ type: 'error', text1: 'Cần quyền truy cập thư viện ảnh để lưu kết quả' });
+        return;
+      }
+      // Close sheet, show loading, then trigger off-screen render
+      ref.current?.close();
+      setIsLoading(true);
+      await onBeforeCapture?.();
+      // Now the off-screen view has rendered — check ref after mount
+      if (!captureViewRef?.current) {
+        Toast.show({ type: 'error', text1: 'Không thể chụp màn hình kết quả' });
+        onAfterCapture?.();
+        setIsLoading(false);
+        return;
+      }
+      const uri = await captureRef(captureViewRef, { format: 'jpg', quality: 0.95 });
+      onAfterCapture?.();
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      setIsLoading(false);
+      setSavedAsset(asset);
+    } catch (e) {
+      onAfterCapture?.();
+      setIsLoading(false);
+      console.error('Download error:', e);
+      Toast.show({ type: 'error', text1: 'Lưu ảnh thất bại, vui lòng thử lại' });
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Toast.show({ type: 'error', text1: 'Chia sẻ không khả dụng trên thiết bị này' });
+        return;
+      }
+      ref.current?.close();
+      await onBeforeCapture?.();
+      if (!captureViewRef?.current) {
+        Toast.show({ type: 'error', text1: 'Không thể chụp màn hình kết quả' });
+        onAfterCapture?.();
+        return;
+      }
+      const uri = await captureRef(captureViewRef, { format: 'jpg', quality: 0.95 });
+      // Keep off-screen view alive until shareAsync fully completes
+      await Sharing.shareAsync(uri, { mimeType: 'image/jpeg', dialogTitle: 'Chia sẻ kết quả xổ số' });
+      onAfterCapture?.();
+    } catch (e) {
+      onAfterCapture?.();
+      console.error('Share error:', e);
+      Toast.show({ type: 'error', text1: 'Chia sẻ thất bại, vui lòng thử lại' });
+    }
+  };
 
   const handleUpdateAppSetting = (newFields: any) => {
     if (isUpdating) return;
@@ -124,46 +208,47 @@ export const ResultSettingsSheet = forwardRef((_, ref: any) => {
   ), []);
 
   return (
-    <BottomSheet
-      ref={ref}
-      index={-1}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      detached={false}
-      handleIndicatorStyle={{ backgroundColor: '#E0E0E0', width: 60 }}
-      topInset={100}
-    >
-      <View style={themed($sheetHeader)}>
-        <Text text="Cài đặt" size="xl" weight="bold" />
-        <TouchableOpacity onPress={() => ref.current?.close()}>
-          <View style={themed($closeBtn)}>
-            <IconClose width={20} height={20} color={colors.palette.neutral400} />
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      <BottomSheetScrollView contentContainerStyle={themed($scrollContent)}>
-        <Text text="THÔNG BÁO KẾT QUẢ" style={themed($sectionLabel)} />
-        <View style={themed($card)}>
-          <SettingRow label="Miền Bắc" icon={IconBell} value={notiSettings?.northResult} themed={themed} colors={colors}
-            onToggle={(val: any) => handleToggleNotification('northResult', val)} />
-          <SettingRow label="Miền Trung" icon={IconBell} value={notiSettings?.centralResult} themed={themed} colors={colors}
-            onToggle={(val: any) => handleToggleNotification('centralResult', val)} />
-          <SettingRow label="Miền Nam" icon={IconBell} value={notiSettings?.southResult} themed={themed} colors={colors}
-            onToggle={(val: any) => handleToggleNotification('southResult', val)} />
+    <>
+      <BottomSheet
+        ref={ref}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        detached={false}
+        handleIndicatorStyle={{ backgroundColor: '#E0E0E0', width: 60 }}
+        topInset={100}
+      >
+        <View style={themed($sheetHeader)}>
+          <Text text="Cài đặt" size="xl" weight="bold" />
+          <TouchableOpacity onPress={() => ref.current?.close()}>
+            <View style={themed($closeBtn)}>
+              <IconClose width={20} height={20} color={colors.palette.neutral400} />
+            </View>
+          </TouchableOpacity>
         </View>
 
-        <Text text="TRẢI NGHIỆM NGƯỜI DÙNG" style={themed($sectionLabel)} />
-        <View style={themed($card)}>
-          <SettingRow label="Đọc kết quả giọng nói" icon={IconVoice} value={appSettings?.isVoiceEnabled} themed={themed} colors={colors}
-            onToggle={(val: any) => handleUpdateAppSetting({ isVoiceEnabled: val })} />
-          <SettingRow label="Bật nhạc Nền" icon={IconMusic} value={appSettings?.isMusicEnabled} themed={themed} colors={colors}
-            onToggle={(val: any) => handleUpdateAppSetting({ isMusicEnabled: val })} />
-          <SettingRow label="Hiện bảng Loto" icon={IconTable} value={appSettings?.showLotoTable} themed={themed} colors={colors}
-            onToggle={(val: any) => handleUpdateAppSetting({ showLotoTable: val })} />
+        <BottomSheetScrollView contentContainerStyle={themed($scrollContent)}>
+          <Text text="THÔNG BÁO KẾT QUẢ" style={themed($sectionLabel)} />
+          <View style={themed($card)}>
+            <SettingRow label="Miền Bắc" icon={IconBell} value={notiSettings?.northResult} themed={themed} colors={colors}
+              onToggle={(val: any) => handleToggleNotification('northResult', val)} />
+            <SettingRow label="Miền Trung" icon={IconBell} value={notiSettings?.centralResult} themed={themed} colors={colors}
+              onToggle={(val: any) => handleToggleNotification('centralResult', val)} />
+            <SettingRow label="Miền Nam" icon={IconBell} value={notiSettings?.southResult} themed={themed} colors={colors}
+              onToggle={(val: any) => handleToggleNotification('southResult', val)} />
+          </View>
 
-          {/* <NumberSelector
+          <Text text="TRẢI NGHIỆM NGƯỜI DÙNG" style={themed($sectionLabel)} />
+          <View style={themed($card)}>
+            <SettingRow label="Đọc kết quả giọng nói" icon={IconVoice} value={appSettings?.isVoiceEnabled} themed={themed} colors={colors}
+              onToggle={(val: any) => handleUpdateAppSetting({ isVoiceEnabled: val })} />
+            <SettingRow label="Bật nhạc Nền" icon={IconMusic} value={appSettings?.isMusicEnabled} themed={themed} colors={colors}
+              onToggle={(val: any) => handleUpdateAppSetting({ isMusicEnabled: val })} />
+            <SettingRow label="Hiện bảng Loto" icon={IconTable} value={appSettings?.showLotoTable} themed={themed} colors={colors}
+              onToggle={(val: any) => handleUpdateAppSetting({ showLotoTable: val })} />
+
+            {/* <NumberSelector
             label="Highlight Loto Đầu" icon={IconHead} themed={themed} disabled={isUpdating}
             selectedNumbers={appSettings?.highlightHead || []}
             onSelect={(num: string) => handleToggleHighlight(num, 'highlightHead')}
@@ -173,36 +258,82 @@ export const ResultSettingsSheet = forwardRef((_, ref: any) => {
             selectedNumbers={appSettings?.highlightTail || []}
             onSelect={(num: string) => handleToggleHighlight(num, 'highlightTail')}
           /> */}
-        </View>
+          </View>
 
-        <Text text="KÍCH THƯỚC CHỮ" style={themed($sectionLabel)} />
-        <View style={themed($fontSizeCard)}>
-          {fontSizes.map(({ label, value, size }) => (
-            <TouchableOpacity key={label} style={[themed($sizeBtn), value === appSettings?.fontSize && themed($sizeBtnActive)]} onPress={() => handleUpdateAppSetting({ fontSize: value })}>
-              <Text text={`𝓐𝒂` + label} size={size as any} weight="medium" style={{ color: value === appSettings?.fontSize ? '#D90404' : '#999' }} />
+          <Text text="KÍCH THƯỚC CHỮ" style={themed($sectionLabel)} />
+          <View style={themed($fontSizeCard)}>
+            {fontSizes.map(({ label, value, size }) => (
+              <TouchableOpacity key={label} style={[themed($sizeBtn), value === appSettings?.fontSize && themed($sizeBtnActive)]} onPress={() => handleUpdateAppSetting({ fontSize: value })}>
+                <Text text={`𝓐𝒂` + label} size={size as any} weight="medium" style={{ color: value === appSettings?.fontSize ? '#D90404' : '#999' }} />
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text text="CHIA SẺ" style={themed($sectionLabel)} />
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, marginBottom: 24, gap: 30 }}>
+            <TouchableOpacity activeOpacity={0.7} onPress={handleDownload} style={{ alignItems: 'center' }}>
+              <View style={themed($iconBigWrapper)}>
+                <IconDownload width={40} height={40} color="#D90404" />
+              </View>
+              <Text text="Tải Kết Quả" size="sm" weight="medium" style={{ color: colors.text }} />
             </TouchableOpacity>
-          ))}
-        </View>
+            <TouchableOpacity activeOpacity={0.7} onPress={handleShare} style={{ alignItems: 'center' }}>
+              <View style={themed($iconBigWrapper)}>
+                <IconShare width={40} height={40} color="#D90404" />
+              </View>
+              <Text text="Chia sẽ kết quả" size="sm" weight="medium" style={{ color: colors.text }} />
+            </TouchableOpacity>
+          </View>
+        </BottomSheetScrollView>
+      </BottomSheet>
 
-        <Text text="CHIA SẺ" style={themed($sectionLabel)} />
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, marginBottom: 24, gap: 30 }}>
-          <View style={{ alignItems: 'center' }}>
-            <View style={themed($iconBigWrapper)}>
-              <IconDownload width={40} height={40} color="#D90404" />
-            </View>
-            <Text text="Tải Kết Quả" size="sm" weight="medium" style={{ color: colors.text }} />
-          </View>
-          <View style={{ alignItems: 'center' }}>
-            <View style={themed($iconBigWrapper)}>
-              <IconShare width={40} height={40} color="#D90404" />
-            </View>
-            <Text text="Chia sẽ kết quả" size="sm" weight="medium" style={{ color: colors.text }} />
+      {/* Loading overlay — shown while capturing & saving the image */}
+      <Modal visible={isLoading} transparent animationType="fade" statusBarTranslucent>
+        <View style={$loadingOverlay}>
+          <View style={$loadingCard}>
+            <ActivityIndicator size="large" color="#C00000" />
+            <Text text="Đang tạo ảnh..." style={$loadingText} />
           </View>
         </View>
-      </BottomSheetScrollView>
-    </BottomSheet>
+      </Modal>
+
+      {/* Success modal — shown after image saved, with 'View in Gallery' CTA */}
+      <Modal
+        visible={!!savedAsset}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setSavedAsset(null)}
+      >
+        <View style={$loadingOverlay}>
+          <View style={$successCard}>
+            <Text text="✅" style={{ fontSize: 40, textAlign: 'center', lineHeight: 80 }} />
+            <Text text="Đã lưu kết quả!" style={$successTitle} />
+            <Text text="Ảnh đã được lưu vào thư viện ảnh của bạn." style={$successSubtitle} />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={$viewImageBtn}
+              onPress={() => {
+                setSavedAsset(null);
+                if (savedAsset) openGallery(savedAsset);
+              }}
+            >
+              <Text text="Xem ảnh" style={$viewImageBtnText} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={$closeModalBtn}
+              onPress={() => setSavedAsset(null)}
+            >
+              <Text text="Đóng" style={$closeModalBtnText} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 });
+
 
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
@@ -334,3 +465,89 @@ const $sizeBtnActive: ThemedStyle<ViewStyle> = () => ({
   shadowRadius: 4,
   elevation: 2,
 })
+
+// -- Modal styles for loading overlay and success dialog --
+
+const $loadingOverlay: ViewStyle = {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.55)',
+  justifyContent: 'center',
+  alignItems: 'center',
+}
+
+const $loadingCard: ViewStyle = {
+  backgroundColor: '#FFF',
+  borderRadius: 20,
+  paddingVertical: 32,
+  paddingHorizontal: 40,
+  alignItems: 'center',
+  gap: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.2,
+  shadowRadius: 16,
+  elevation: 12,
+}
+
+const $loadingText: TextStyle = {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+  marginTop: 4,
+}
+
+const $successCard: ViewStyle = {
+  backgroundColor: '#FFF',
+  borderRadius: 24,
+  paddingVertical: 32,
+  paddingHorizontal: 28,
+  alignItems: 'center',
+  gap: 10,
+  width: '85%',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.2,
+  shadowRadius: 16,
+  elevation: 12,
+}
+
+const $successTitle: TextStyle = {
+  fontSize: 20,
+  fontWeight: '800',
+  color: '#111',
+  marginTop: 4,
+}
+
+const $successSubtitle: TextStyle = {
+  fontSize: 14,
+  color: '#666',
+  textAlign: 'center',
+  marginBottom: 8,
+}
+
+const $viewImageBtn: ViewStyle = {
+  backgroundColor: '#C00000',
+  borderRadius: 14,
+  paddingVertical: 13,
+  paddingHorizontal: 40,
+  width: '100%',
+  alignItems: 'center',
+}
+
+const $viewImageBtnText: TextStyle = {
+  color: '#FFF',
+  fontWeight: '700',
+  fontSize: 16,
+}
+
+const $closeModalBtn: ViewStyle = {
+  paddingVertical: 10,
+  paddingHorizontal: 24,
+  alignItems: 'center',
+}
+
+const $closeModalBtnText: TextStyle = {
+  color: '#999',
+  fontSize: 14,
+  fontWeight: '500',
+}

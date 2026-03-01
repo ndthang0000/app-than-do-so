@@ -4,14 +4,36 @@ import { SouthResult } from "@/screens/SouthResult"
 import { useAppTheme } from "@/theme/context"
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs"
 import { AnimatedTabLabel } from "./CustomTabLabel"
-import { memo } from "react"
+import { memo, useCallback } from "react"
 
 const Tab = createMaterialTopTabNavigator()
 
-export const ResultTicketTab = memo(() => {
+interface Props {
+  hideTabBar?: boolean
+  onActiveRegionChange?: (region: "south" | "central" | "north") => void
+}
+
+export const ResultTicketTab = memo(({ hideTabBar = false, onActiveRegionChange }: Props) => {
   const { theme: { colors, spacing } } = useAppTheme()
+
+  const handleTabChange = useCallback((tabName: string) => {
+    const map: Record<string, "south" | "central" | "north"> = {
+      Nam: "south",
+      Trung: "central",
+      Bac: "north",
+    }
+    const region = map[tabName]
+    if (region) onActiveRegionChange?.(region)
+  }, [onActiveRegionChange])
+
   return (
     <Tab.Navigator
+      screenListeners={{
+        focus: (e) => {
+          const name = (e.target as string).split("-")[0]
+          handleTabChange(name)
+        },
+      }}
       screenOptions={{
         lazy: true,
         swipeEnabled: true,
@@ -20,20 +42,19 @@ export const ResultTicketTab = memo(() => {
         tabBarIndicatorStyle: { height: 0 },
         tabBarPressColor: 'transparent',
         tabBarStyle: {
-          backgroundColor: colors.palette.accent400, // Màu nền xám nhạt cho cả thanh tab
+          backgroundColor: colors.palette.accent400,
           borderRadius: 12,
           marginHorizontal: spacing.sm,
           marginVertical: spacing.xxs,
-          height: 40, // Ép chiều cao thấp xuống
+          height: hideTabBar ? 0 : 40,
+          overflow: 'hidden',
           elevation: 0,
           shadowOpacity: 0,
-          overflow: 'hidden',
         },
         tabBarItemStyle: {
           flex: 1,
           padding: 0,
         },
-        // Quan trọng: Dùng container để căn giữa các tab
         tabBarContentContainerStyle: {
           alignItems: 'center',
           paddingHorizontal: 3,
@@ -86,3 +107,4 @@ export const ResultTicketTab = memo(() => {
     </Tab.Navigator>
   )
 })
+

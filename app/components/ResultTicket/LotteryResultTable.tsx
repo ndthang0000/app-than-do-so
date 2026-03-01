@@ -28,6 +28,7 @@ type Props = {
   provinces?: LotteryResult[] // Optional: if provided, use this data instead of fetching from Redux
   winDetails?: PrizeKey[] // Optional: array of winning prizes to highlight
   isShowHeader?: boolean // Optional: whether to show header row
+  isCaptureMode?: boolean // When true, hides LotoTable, DisplayModeToggle, and highlight bar
 }
 
 
@@ -40,7 +41,7 @@ const PRIZES_NORTH: PrizeKey[] = [
 ]
 
 
-export const LotteryResultTable = memo(({ region, isLive, station, date, provinces: provincesProp, winDetails, isShowHeader = true }: Props) => {
+export const LotteryResultTable = memo(({ region, isLive, station, date, provinces: provincesProp, winDetails, isShowHeader = true, isCaptureMode = false }: Props) => {
 
   const $containerInsets = useSafeAreaInsetsStyle(["bottom"])
   const { themed, theme: { colors } } = useAppTheme();
@@ -135,7 +136,7 @@ export const LotteryResultTable = memo(({ region, isLive, station, date, provinc
 
   useEffect(() => {
     if (appState !== "active" || !isLiveActive) {
-    // Ứng dụng chuyển sang nền hoặc đã kết thúc, tạm dừng nhạc
+      // Ứng dụng chuyển sang nền hoặc đã kết thúc, tạm dừng nhạc
       rollingSoundRef.current?.pause();
     } else {
       // Ứng dụng trở lại foreground, nếu isLiveActive và isMusicEnabled thì tiếp tục phát nhạc
@@ -304,29 +305,31 @@ export const LotteryResultTable = memo(({ region, isLive, station, date, provinc
           ))
         }
       </View>
-      <DisplayModeToggleV2 value={displayMode} onChange={handleChangeDisplayMode} />
-      <View style={themed($highlightBar)}>
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-          <TouchableOpacity
-            key={num}
-            onPress={() => handleToggleHighlight(num)}
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 15,
-              backgroundColor: highlightDigit === num ? colors.primary : colors.palette.neutral200,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text
-              text={num.toString()}
-              style={{ color: highlightDigit === num ? colors.background : colors.text, fontWeight: 'bold' }}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-      {appSettings?.showLotoTable && <LotoTable provinces={provinces} region={region} />}
+      {!isCaptureMode && <DisplayModeToggleV2 value={displayMode} onChange={handleChangeDisplayMode} />}
+      {!isCaptureMode && (
+        <View style={themed($highlightBar)}>
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+            <TouchableOpacity
+              key={num}
+              onPress={() => handleToggleHighlight(num)}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: highlightDigit === num ? colors.primary : colors.palette.neutral200,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text
+                text={num.toString()}
+                style={{ color: highlightDigit === num ? colors.background : colors.text, fontWeight: 'bold' }}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {!isCaptureMode && appSettings?.showLotoTable && <LotoTable provinces={provinces} region={region} />}
     </View>
   )
 })
